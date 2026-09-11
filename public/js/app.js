@@ -8,6 +8,7 @@ import { initSettingsPanel, updateConnIndicator } from './settingsPanel.js'
 import { connect as connectWs } from './wsClient.js'
 
 let ws = null
+let mapApi = null // mapController.initMap() 返回的控制器实例（updatePosition 等是它的方法，不在模块命名空间上）
 let lastConfig = null
 
 boot()
@@ -27,7 +28,7 @@ async function boot() {
     await promptForToken() // 口令校验通过后再继续
   }
 
-  map.initMap(document.getElementById('map'), lastConfig.mapProvider, {
+  mapApi = map.initMap(document.getElementById('map'), lastConfig.mapProvider, {
     trackEnabled: lastConfig.trackEnabled !== false,
   })
 
@@ -42,7 +43,7 @@ async function boot() {
 function openSocket() {
   ws = connectWs({
     onPosition: (pos) => {
-      map.updatePosition(pos)
+      mapApi?.updatePosition(pos)
       ui.updateInfoPanel(pos)
     },
     onStatus: onStatus,
@@ -60,13 +61,13 @@ function openSocket() {
 }
 
 function onStatus(status) {
-  map.setFlightActive(Boolean(status.flightActive))
+  mapApi?.setFlightActive(Boolean(status.flightActive))
   ui.updateStatusBanner(status)
   updateConnIndicator(status)
 }
 
 function bindButtons() {
-  document.getElementById('recenter-btn')?.addEventListener('click', () => map.recenter())
+  document.getElementById('recenter-btn')?.addEventListener('click', () => mapApi?.recenter())
 }
 
 /** 历史航迹补画（§5.4：刷新页面后补画最近 N 分钟航迹） */
@@ -74,7 +75,7 @@ async function backfillTrack() {
   try {
     const minutes = lastConfig?.trackMaxMinutes ?? 30
     const data = await api(`/api/track?minutes=${minutes}`)
-    map.loadTrack(data.points || [])
+    mapApi?.loadTrack(data.points || [])
   } catch {
     /* 航迹补画失败不影响主流程 */
   }
