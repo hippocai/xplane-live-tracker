@@ -4,25 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目状态（务必先读）
 
-- 本仓库目前**只有设计文档，尚无任何代码**：仅有 `README.md` 与 `design_specs.md` 两个文件，也未初始化 git。
-- **`design_specs.md`（v1.3）是权威实现规范**。README 中引用的《XPlane12-飞机位置追踪工具-设计文档.md》即指此文件。动手实现任何模块前，必须先阅读 `design_specs.md` 第 15 节对应小节——那里给出了每个文件的路径、职责、函数签名、边界情况处理要求与验收标准（Definition of Done）。实现时允许微调签名，但对外 REST/WS 协议（第 4.3.2、7 节）必须保持不变。
-- README 中的目录结构、`.env` 变量表、快速开始步骤均描述的是**目标状态**，不是现状。
+- **v1 已实现**（对应设计文档里程碑 M1–M7，外加 §9 的 ACCESS_TOKEN 可选鉴权）。代码位于 `server/src/`（后端）与 `public/`（前端）。
+- **`design_specs.md`（v1.3）是权威实现规范**。README 中引用的《XPlane12-飞机位置追踪工具-设计文档.md》即指此文件。改动任何模块前，先读 `design_specs.md` 第 15 节对应小节——那里有每个文件的职责、函数签名、边界情况处理要求与验收标准。实现允许微调签名，但对外 REST/WS 协议（第 4.3.2、7 节）必须保持不变。
+- **未实现的项**：M8 可选项中的 Google Maps 底图切换（`mapController.js` 目前无论 provider 一律用 OSM 瓦片兜底，参数与 `/api/config` 字段已预留）。
+- **UDP 行映射**：X-Plane DATA 广播的行号映射集中在 `server/src/xplane/udpClient.js` 顶部的 `DATA_ROW_MAP`（含"需要在 X-Plane Data Output 中启用哪些行"的说明）。若某版本行号定义有出入，只调该表即可。UDP 解析做了小端/大端自适应探测。
 
 ## 命令
 
-代码尚未存在。首次创建 `package.json` 时，脚本必须与设计规范 §15.2 一致（ESM：`"type": "module"`，Node ≥ 20）：
-
 ```bash
-npm install
-npm start        # node src/index.js
-npm run dev      # node --watch src/index.js
+npm install      # postinstall 会把 Leaflet 复制到 public/vendor/（勿提交 vendor）
+npm start        # node server/src/index.js
+npm run dev      # node --watch server/src/index.js
 npm run lint     # eslint .
 npm run format   # prettier --write .
-npm test         # node --test （Node 20 内置测试器，不引入 jest/vitest）
+npm test         # node --test server/test/*.test.js （Node 内置测试器，不引入 jest/vitest）
 ```
 
-- 运行单个测试文件：`node --test path/to/test.test.js`
-- 启动后终端应按 §8.2 示例打印局域网访问地址与二维码提示。
+- 运行单个测试文件：`node --test server/test/trackStore.test.js`
+- 冒烟验证：`npm start` 后 `curl http://127.0.0.1:3000/api/status`，无 X-Plane 环境应返回 `connected:false, flightActive:false` 且进程不退出（T1）。
 
 ## 架构（大图景）
 
