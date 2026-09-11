@@ -2,7 +2,7 @@
 
 X-Plane 12 实时飞机位置追踪工具。在局域网内实时查看 X-Plane 12 正在模拟飞行的飞机位置。后端（Node.js）读取 X-Plane 数据并通过 WebSocket 推送，任意设备（iPad、手机、电脑）打开浏览器输入后端 IP 即可在地图上实时查看飞机位置和航迹。
 
-详细设计见 [`XPlane12-飞机位置追踪工具-设计文档.md`](./XPlane12-飞机位置追踪工具-设计文档.md)，本 README 仅作快速上手指南。
+详细设计见 [`design_specs.md`](./design_specs.md)，本 README 仅作快速上手指南。
 
 ## 功能特性
 
