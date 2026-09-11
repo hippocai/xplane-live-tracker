@@ -35,6 +35,11 @@ const xplaneManager = new XPlaneManager()
 // 启动时若 X-Plane 尚未就绪，manager 内部会自动重试，不阻塞服务启动
 await xplaneManager.start()
 
+// 数据流（设计文档 §5.3）：position 事件 → 航迹环形缓冲（供 /api/track 与刷新补画）
+xplaneManager.on('position', (pos) => {
+  trackStore.push({ lat: pos.lat, lon: pos.lon, timestamp: pos.timestamp })
+})
+
 const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '100kb' }))
