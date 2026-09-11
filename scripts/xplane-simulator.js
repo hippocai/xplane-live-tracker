@@ -43,7 +43,7 @@ function parseArgs(argv) {
       case '--udp-port': args.udpPort = Number(val()); break
       case '--speed': args.speed = Number(val()); break
       case '--tail': args.tail = val(); break
-      default: console.warn(`⚠ 未知参数 ${key}，已忽略`)
+      default: console.warn(`[!!] 未知参数 ${key}，已忽略`)
     }
   }
   return args
@@ -193,7 +193,7 @@ class FlightModel {
           this.#startLeg(this.leg + 1)
         } else {
           this.arrived = true
-          console.log('🛬 航班已到达终点，保持停机发报（p 暂停 / t 传送 / q 退出）')
+          console.log('[到达] 航班已到终点，保持停机发报（p 暂停 / t 传送 / q 退出）')
         }
       }
     }
@@ -223,7 +223,7 @@ class FlightModel {
     const current = this.scenario.circle ? this.state : this.pos
     const inChina = isRoughlyChina(current)
     const target = inChina ? { lat: 40.71, lon: -74.01, alt: 10500 } : { lat: 39.9, lon: 116.6, alt: 10000 }
-    console.log(`⚡ 传送跳变：${current.lat.toFixed(2)},${current.lon.toFixed(2)} → ${target.lat},${target.lon}`)
+    console.log(`[跳变] 传送：${current.lat.toFixed(2)},${current.lon.toFixed(2)} -> ${target.lat},${target.lon}`)
     this.pos = { lat: target.lat, lon: target.lon }
     this.alt = target.alt
     if (this.scenario.circle) {
@@ -282,7 +282,7 @@ const DATAREF_BY_NAME = new Map(DATAREFS.map((d) => [d.name, d]))
 const args = parseArgs(process.argv)
 const scenario = SCENARIOS[args.scenario]
 if (!scenario) {
-  console.error(`✗ 未知场景 "${args.scenario}"，可选：${Object.keys(SCENARIOS).join(' / ')}`)
+  console.error(`[!!] 未知场景 "${args.scenario}"，可选：${Object.keys(SCENARIOS).join(' / ')}`)
   process.exit(1)
 }
 
@@ -319,7 +319,7 @@ if (args.mode === 'webapi' || args.mode === 'both') {
 
   wss = new WebSocketServer({ server: httpServer, path: '/api/v2/ws' })
   wss.on('connection', (ws) => {
-    console.log('🔌 有客户端建立 WebSocket 连接')
+    console.log('[连接] 客户端建立 WebSocket 连接')
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString())
@@ -329,7 +329,7 @@ if (args.mode === 'webapi' || args.mode === 'both') {
             frequency: msg.data?.frequency || args.hz,
             requestId: msg.request_id ?? 1
           })
-          console.log(`📡 收到订阅：${msg.data?.ids?.length ?? 0} 个 dataref @ ${msg.data?.frequency}Hz`)
+          console.log(`[订阅] ${msg.data?.ids?.length ?? 0} 个 dataref @ ${msg.data?.frequency}Hz`)
         }
       } catch {
         /* 忽略非 JSON 消息 */
@@ -337,16 +337,16 @@ if (args.mode === 'webapi' || args.mode === 'both') {
     })
     ws.on('close', () => {
       subscriptions.delete(ws)
-      console.log('🔌 客户端 WebSocket 断开')
+      console.log('[断开] 客户端 WebSocket 断开')
     })
   })
 
   httpServer.listen(args.httpPort, '127.0.0.1', () => {
-    console.log(`✔ Web API 模拟就绪：http://127.0.0.1:${args.httpPort}/api/v2/capabilities`)
+    console.log(`[OK] Web API 模拟就绪：http://127.0.0.1:${args.httpPort}/api/v2/capabilities`)
   })
   httpServer.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`✗ 端口 ${args.httpPort} 被占用（真实 X-Plane 在运行？）。请用 --http-port 换端口，或关闭 X-Plane。`)
+      console.error(`[!!] 端口 ${args.httpPort} 被占用（真实 X-Plane 在运行？）。请用 --http-port 换端口，或关闭 X-Plane。`)
       process.exit(1)
     }
     throw err
@@ -433,7 +433,7 @@ timer.unref?.()
 const statusTimer = setInterval(() => {
   const st = model.snapshot()
   console.log(
-    `✈ ${st.lat.toFixed(4)}, ${st.lon.toFixed(4)}  高度 ${st.altMsl.toFixed(0)}m  地速 ${(st.gsMps * KT_PER_MPS).toFixed(0)}kt  航向 ${st.heading.toFixed(0)}°  [ws:${wsSendCount} udp:${udpSendCount}${paused ? ' ⏸已暂停' : ''}]`
+    `[飞机] ${st.lat.toFixed(4)}, ${st.lon.toFixed(4)}  高度 ${st.altMsl.toFixed(0)}m  地速 ${(st.gsMps * KT_PER_MPS).toFixed(0)}kt  航向 ${st.heading.toFixed(0)}°  [ws:${wsSendCount} udp:${udpSendCount}${paused ? ' [已暂停]' : ''}]`
   )
 }, 5000)
 statusTimer.unref?.()
@@ -441,7 +441,7 @@ statusTimer.unref?.()
 // —— 控制逻辑（stdin 命令与 HTTP 端点共用）——
 function doPause() {
   paused = !paused
-  console.log(paused ? '⏸ 数据推送已暂停（后端将在静默超时后判定"无飞行"）' : '▶ 数据推送已恢复')
+  console.log(paused ? '[暂停] 数据推送已暂停（后端将在静默超时后判定"无飞行"）' : '[恢复] 数据推送已恢复')
   return paused
 }
 
@@ -451,7 +451,7 @@ function doTeleport() {
 
 function doDrop() {
   if (!wss) {
-    console.log('⚠ 当前模式未启用 Web API，无 WebSocket 可断开')
+    console.log('[!!] 当前模式未启用 Web API，无 WebSocket 可断开')
     return
   }
   let n = 0
@@ -459,11 +459,11 @@ function doDrop() {
     ws.close(1001, 'simulator drop')
     n++
   }
-  console.log(`📉 已主动断开 ${n} 个 WebSocket 连接（观察后端退避重连日志）`)
+  console.log(`[断开] 已主动断开 ${n} 个 WebSocket 连接（观察后端退避重连日志）`)
 }
 
 function doQuit() {
-  console.log('👋 模拟器退出')
+  console.log('[退出] 模拟器退出')
   clearInterval(timer)
   clearInterval(statusTimer)
   if (wss) for (const ws of wss.clients) ws.close()
@@ -514,7 +514,7 @@ if (process.stdin.isTTY) {
 process.on('SIGINT', doQuit)
 
 // —— 启动横幅 ——
-console.log('✔ X-Plane 协议模拟器已启动')
+console.log('[OK] X-Plane 协议模拟器已启动')
 console.log(`  模式: ${args.mode}  场景: ${args.scenario} —— ${scenario.desc}`)
 console.log(`  推送频率: ${args.hz}Hz  时间倍速: ${args.speed}x（1 实秒 = ${args.speed} 模拟秒）`)
 if (args.mode === 'webapi' || args.mode === 'both') {

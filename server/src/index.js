@@ -81,16 +81,17 @@ server.on('error', (err) => {
 })
 
 server.listen(cfg.port, '0.0.0.0', async () => {
-  // 启动横幅：与 README §快速开始 中描述的终端输出一致
-  console.log('✔ X-Plane Tracker 已启动')
+  // 启动横幅。注意：不要在控制台输出中使用 emoji（✔✈⚠ 等），
+  // 中文 Windows 传统控制台（GBK 代码页）缺字形会显示乱码。
+  console.log('[OK] X-Plane Tracker 已启动')
   const lanUrls = await getLocalUrls(cfg.port)
   if (lanUrls.length === 0) {
-    console.log(`⚠ 未检测到局域网 IPv4 地址，仅可通过 http://localhost:${cfg.port} 本机访问`)
+    console.log(`[!!] 未检测到局域网 IPv4 地址，仅可通过 http://localhost:${cfg.port} 本机访问`)
   } else {
     for (const { iface, url } of lanUrls) {
-      console.log(`✔ 局域网访问地址: ${url}  （网卡: ${iface}）`)
+      console.log(`[OK] 局域网访问地址: ${url}  （网卡: ${iface}）`)
     }
-    console.log('✔ 已生成二维码，可在首页查看')
+    console.log('[OK] 已生成二维码，可在首页查看')
   }
   logger.info({ port: cfg.port, mode: xplaneManager.activeMode }, '服务启动完成')
 })

@@ -15,6 +15,13 @@
   box-sizing: border-box;
 }
 
+/* hidden 属性必须始终生效：
+   否则 .auth-overlay 的 display:flex（作者样式）会覆盖 UA 的 [hidden]{display:none}，
+   导致口令输入层在未启用鉴权时也悬浮在页面上（已实际发生过） */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
