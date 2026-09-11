@@ -52,6 +52,16 @@ export function showWsLost(show) {
   }
 }
 
+/** 底部轻提示（底图切换、切换成功等），2.2s 自动消失 */
+export function toast(text) {
+  const el = document.getElementById('toast')
+  if (!el) return
+  el.textContent = text
+  el.hidden = false
+  clearTimeout(toast._t)
+  toast._t = setTimeout(() => (el.hidden = true), 2200)
+}
+
 /**
  * 信息面板渲染。pos 为 null 时全部显示 "--"（数值区域整体置灰由 CSS .inactive 控制）。
  * @param {Object|null} pos AircraftPosition

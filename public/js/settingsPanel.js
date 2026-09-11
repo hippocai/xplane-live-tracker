@@ -2,7 +2,7 @@
 // 打开时 GET /api/xplane-mode 回填表单；保存时 POST 提交热切换；
 // loading / 错误提示 / 单选联动参数输入框的启停都在本模块内处理。
 import { api } from './api.js'
-import { setConnecting } from './ui.js'
+import { setConnecting, toast } from './ui.js'
 
 let busy = false
 
@@ -55,7 +55,7 @@ export function initSettingsPanel({ onStatusUpdate }) {
         body: JSON.stringify(body),
       })
       onStatusUpdate?.(status)
-      showToast('切换成功')
+      toast('切换成功')
       panel.hidden = true
     } catch (err) {
       // 失败：展示具体错误且不关闭面板，方便用户重试（§6.4 交互流程 3）
@@ -107,13 +107,4 @@ export function updateConnIndicator(status) {
         ? new Date(status.webapi.lastUpdate || status.udp.lastUpdate).toLocaleTimeString('zh-CN')
         : '--'
   }
-}
-
-function showToast(text) {
-  const toast = document.getElementById('toast')
-  if (!toast) return
-  toast.textContent = text
-  toast.hidden = false
-  clearTimeout(showToast._t)
-  showToast._t = setTimeout(() => (toast.hidden = true), 2200)
 }

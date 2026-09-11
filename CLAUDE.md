@@ -45,6 +45,7 @@ npm test         # node --test server/test/*.test.js （Node 内置测试器，�
 - **只读原则**：本工具只读 X-Plane 数据，绝不写入 dataref / 下发 command。
 - **航迹跳变检测**：相邻两点距离超阈值（默认 5km/更新周期，可配）时照常存入 `trackStore` 但标记 `breakBefore: true`，前端在此断开航迹线（teleport 场景）。
 - **后端监听 `0.0.0.0`**（供局域网设备访问），X-Plane Web API 只走本机 `127.0.0.1`。
+- **百度底图区域自动切换**：`public/js/geo.js` 为坐标纯函数层（WGS84⇄GCJ02⇄BD09 纠偏、BD09→百度墨卡托/Krassovsky 椭球闭式投影、大陆判定 = bbox − 港澳台），`baiduCrs.js` 将其注入 Leaflet 自定义 CRS——调用方全程使用 WGS84 数值。切换逻辑在 `mapController.updatePosition`（进入用精确边界、离开用外扩 0.3° 迟滞防抖），通过销毁重建地图恢复视图/航迹/图标。**投影正确性由 `server/test/geoConvert.test.js` 以 proj4 为 oracle 保证（<0.01m），改动投影公式必须跑该测试**。百度瓦片免 AK URL 若失效，只需改 `baiduCrs.js` 的 `BAIDU_TILE_URL`。
 
 ## 代码规范（§15.1）
 
