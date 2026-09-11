@@ -1,0 +1,32 @@
+{
+  "name": "xplane-live-tracker",
+  "version": "0.1.0",
+  "description": "X-Plane 12 实时飞机位置追踪工具",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/src/index.js",
+    "dev": "node --watch server/src/index.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "node --test server/test/*.test.js",
+    "postinstall": "node scripts/copy-vendor.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "leaflet": "^1.9.4",
+    "pino": "^9.4.0",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.10.0",
+    "eslint": "^9.10.0",
+    "globals": "^15.9.0",
+    "prettier": "^3.3.0"
+  }
+}

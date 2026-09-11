@@ -1,0 +1,4 @@
+# 文档与生成文件不做 prettier 重排
+*.md
+package-lock.json
+public/vendor/
