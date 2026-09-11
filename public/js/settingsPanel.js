@@ -6,6 +6,19 @@ import { setConnecting, toast } from './ui.js'
 
 let busy = false
 
+// 连接参数默认值（与 index.html 输入框的 value 属性、.env.example 保持一致）。
+// 目的：用户通常无需任何输入即可"保存并切换"；留空的输入框保存时回落到默认值。
+const DEFAULTS = { webapiHost: '127.0.0.1', webapiPort: 8086, udpPort: 49005 }
+
+/** 读端口输入框：留空回落默认值；填了但非法（非 1-65535 整数）返回 null */
+function readPort(inputId, fallback) {
+  const raw = document.getElementById(inputId).value.trim()
+  if (raw === '') return fallback
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 65535) return null
+  return n
+}
+
 /**
  * @param {{onStatusUpdate: Function}} opts 状态更新回调（供连接指示灯刷新）
  */
@@ -35,21 +48,29 @@ export function initSettingsPanel({ onStatusUpdate }) {
     if (busy) return
     const mode = panel.querySelector('input[name="mode"]:checked')?.value
     if (!mode) return
+    // 先做客户端校验（留空回落默认；非法端口直接提示，不发请求），减轻后端来回
+    const host =
+      mode === 'webapi'
+        ? document.getElementById('webapi-host').value.trim() || DEFAULTS.webapiHost
+        : undefined
+    const port =
+      mode === 'webapi'
+        ? readPort('webapi-port', DEFAULTS.webapiPort)
+        : readPort('udp-port', DEFAULTS.udpPort)
+    if (port == null) {
+      errBox.textContent = '端口需为 1-65535 的整数（留空使用默认值）'
+      return
+    }
     busy = true
     btnSave.disabled = true
     btnSave.textContent = '正在切换…'
     errBox.textContent = ''
     setConnecting(true)
     try {
-      const body = { activeMode: mode }
-      if (mode === 'webapi') {
-        body.webapi = {
-          host: document.getElementById('webapi-host').value.trim(),
-          port: Number(document.getElementById('webapi-port').value),
-        }
-      } else {
-        body.udp = { listenPort: Number(document.getElementById('udp-port').value) }
-      }
+      const body =
+        mode === 'webapi'
+          ? { activeMode: mode, webapi: { host, port } }
+          : { activeMode: mode, udp: { listenPort: port } }
       const status = await api('/api/xplane-mode', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -79,9 +100,9 @@ export function initSettingsPanel({ onStatusUpdate }) {
       const status = await api('/api/xplane-mode')
       onStatusUpdate?.(status)
       for (const radio of radios()) radio.checked = radio.value === status.activeMode
-      document.getElementById('webapi-host').value = status.webapi?.host ?? '127.0.0.1'
-      document.getElementById('webapi-port').value = status.webapi?.port ?? 8086
-      document.getElementById('udp-port').value = status.udp?.listenPort ?? 49005
+      document.getElementById('webapi-host').value = status.webapi?.host ?? DEFAULTS.webapiHost
+      document.getElementById('webapi-port').value = status.webapi?.port ?? DEFAULTS.webapiPort
+      document.getElementById('udp-port').value = status.udp?.listenPort ?? DEFAULTS.udpPort
       syncParamGroups()
     } catch (err) {
       errBox.textContent = `读取当前配置失败：${err.message}`
@@ -94,9 +115,10 @@ export function updateConnIndicator(status) {
   const ind = document.getElementById('conn-indicator')
   const last = document.getElementById('conn-last')
   if (!ind) return
+  // 三态：已连接 / 从未收到过数据（未连接）/ 收到过数据但当前断开（连接中）
   if (status.connected) {
     ind.textContent = '🟢 已连接'
-  } else if (status.activeMode) {
+  } else if (status.webapi?.lastUpdate || status.udp?.lastUpdate) {
     ind.textContent = '🟡 连接中 / 未连接'
   } else {
     ind.textContent = '🔴 未连接'

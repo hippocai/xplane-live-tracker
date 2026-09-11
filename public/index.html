@@ -56,11 +56,25 @@
         <div class="mode-params" id="webapi-params">
           <div class="field-row">
             <label for="webapi-host">Host</label>
-            <input id="webapi-host" type="text" autocomplete="off" spellcheck="false" />
+            <input
+              id="webapi-host"
+              type="text"
+              value="127.0.0.1"
+              placeholder="127.0.0.1"
+              autocomplete="off"
+              spellcheck="false"
+            />
           </div>
           <div class="field-row">
             <label for="webapi-port">Port</label>
-            <input id="webapi-port" type="number" min="1" max="65535" />
+            <input
+              id="webapi-port"
+              type="number"
+              min="1"
+              max="65535"
+              value="8086"
+              placeholder="8086"
+            />
           </div>
         </div>
 
@@ -71,7 +85,14 @@
         <div class="mode-params" id="udp-params">
           <div class="field-row">
             <label for="udp-port">监听端口</label>
-            <input id="udp-port" type="number" min="1" max="65535" />
+            <input
+              id="udp-port"
+              type="number"
+              min="1"
+              max="65535"
+              value="49005"
+              placeholder="49005"
+            />
           </div>
           <p class="hint">请确认已在 X-Plane 的 Settings → Data Output 中将数据发送到本机此端口</p>
         </div>
