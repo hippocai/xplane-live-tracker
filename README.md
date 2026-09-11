@@ -85,6 +85,22 @@ xplane-live-tracker/
 - **地图显示灰色、提示"当前没有飞机在飞行"**：说明已连接 X-Plane 但暂无有效飞行数据（如停在主菜单、模拟暂停），在 X-Plane 中加载飞机并开始飞行后会自动恢复。
 - **iPad/手机打不开页面**：确认设备与运行本工具的电脑处于同一局域网，且电脑防火墙已放行对应端口。
 
+## 本地联调（无 X-Plane 也能跑）
+
+仓库自带 X-Plane 协议模拟器，可同时模拟 Web API（REST + WebSocket 订阅）与 UDP DATA 广播：
+
+```bash
+npm run simulate                          # 默认：双协议 + 东京→上海 航线（飞入大陆触发百度底图）
+npm run simulate -- --scenario circle     # 绕北京盘旋
+npm run simulate -- --mode udp --udp-port 49005   # 仅 UDP
+```
+
+可选场景：`enter-china`（东京→上海）、`exit-china`（上海→东京）、`cross-boundary`（短途跨界）、`domestic`（沪→京）、`circle`（盘旋）。启动后端 `npm start` 后会自动连上模拟器。
+
+运行中控制命令（回车确认）：`p`=暂停/恢复推送（测"无飞行"置灰）、`t`=传送跳变（测航迹断线）、`d`=断开 WebSocket（测自动重连）、`q`=退出。另有 HTTP 控制端点 `/sim/pause` `/sim/resume` `/sim/teleport` `/sim/drop` `/sim/status` 便于自动化测试。
+
+> 时间倍速默认 4x（隐含地速约 3456km/h，恰在后端传送检测阈值 3600km/h 内）。倍速再高航迹会全部断线——那是跳变检测在正确工作，不是 bug。
+
 ## 开发说明
 
 给 Claude Code / 开发者的完整模块设计、函数签名、验收标准请参阅设计文档第 15 节《模块详细设计与开发任务清单》。

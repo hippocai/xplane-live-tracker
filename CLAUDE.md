@@ -21,6 +21,7 @@ npm test         # node --test server/test/*.test.js （Node 内置测试器，�
 ```
 
 - 运行单个测试文件：`node --test server/test/trackStore.test.js`
+- 协议模拟器：`npm run simulate`（`scripts/xplane-simulator.js`，同时模拟 Web API 与 UDP DATA 广播，支持场景/倍速/暂停/传送/断连，详见 README"本地联调"）。联调后端时先 `npm start` 再 `npm run simulate`，后端会自动连上。
 - 冒烟验证：`npm start` 后 `curl http://127.0.0.1:3000/api/status`，无 X-Plane 环境应返回 `connected:false, flightActive:false` 且进程不退出（T1）。
 
 ## 架构（大图景）
