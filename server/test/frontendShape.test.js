@@ -16,7 +16,7 @@ const publicJsDir = path.resolve(
   '..',
   '..',
   'public',
-  'js'
+  'js',
 )
 
 // app.js 依赖的控制器方法（须存在于 initMap() 返回的 api 对象上）
@@ -35,7 +35,7 @@ test('app.js 不通过模块命名空间误调 api 方法（须走 initMap() 返
     // 允许 mapApi?.method；禁止 map.method（不会误伤 mapApi.，因为其后是字母不是点）
     assert.ok(
       !new RegExp(`\\bmap\\.${m}\\b`).test(src),
-      `app.js 不应调用 map.${m}（这些方法在 initMap() 返回的实例上）`
+      `app.js 不应调用 map.${m}（这些方法在 initMap() 返回的实例上）`,
     )
   }
 })

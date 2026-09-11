@@ -17,8 +17,14 @@ npm start        # node server/src/index.js
 npm run dev      # node --watch server/src/index.js
 npm run lint     # eslint .
 npm run format   # prettier --write .
-npm test         # node --test server/test/*.test.js （Node 内置测试器，不引入 jest/vitest）
+npm test         # node --test server/test/*.test.js（Node 内置测试器，不引入 jest/vitest）
 ```
+
+测试覆盖三层（改前端 JS 或后端协议后都应跑 `npm test`）：
+- 后端单元：trackStore / configStore / UDP 解析 / WebAPI 数值映射 / geo 坐标转换（proj4 oracle）
+- 前端模块（node 直接 import public/js，用极简 DOM/Leaflet/WebSocket/fetch 替身，见 `server/test/frontendHelpers.js`）：api / ui / wsClient / mapController（含底图切换与迟滞）/ settingsPanel / baiduCrs / frontendShape（防命名空间误用回归）
+- 服务端集成 `serverIntegration.test.js`：spawn 真实服务进程，覆盖全部 REST 接口与 WS hello/ping 协议
+- 注意：前端模块测试若断言失败，务必保证 connect() 建立的定时器被清理（用例用 `t.after` 兜底），否则泄漏的 setInterval 会让测试进程永不退出（已踩过）
 
 - 运行单个测试文件：`node --test server/test/trackStore.test.js`
 - 协议模拟器：`npm run simulate`（`scripts/xplane-simulator.js`，同时模拟 Web API 与 UDP DATA 广播，支持场景/倍速/暂停/传送/断连，详见 README"本地联调"）。联调后端时先 `npm start` 再 `npm run simulate`，后端会自动连上。
