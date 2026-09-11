@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>X-Plane Live Tracker</title>
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <!-- 无飞行/未连接提示条（设计文档 §6.6.2） -->
+    <div id="status-banner" class="banner"></div>
+
+    <!-- 地图容器 -->
+    <div id="map"></div>
+
+    <!-- 首次访问引导：局域网地址 + 二维码（F10，可折叠） -->
+    <details id="lan-box" class="panel" open>
+      <summary>📱 其它设备扫码 / 打开</summary>
+      <div id="lan-list" class="lan-list"></div>
+    </details>
+
+    <!-- 悬浮信息面板（F6） -->
+    <div id="info-panel" class="panel">
+      <div class="info-title">✈ <span id="i-tail">--</span></div>
+      <div class="info-grid">
+        <div><label>高度 MSL</label><b id="i-alt">--</b></div>
+        <div><label>离地 AGL</label><b id="i-agl">--</b></div>
+        <div><label>地速</label><b id="i-gs">--</b></div>
+        <div><label>指示空速</label><b id="i-ias">--</b></div>
+        <div><label>航向</label><b id="i-hdg">--</b></div>
+        <div><label>垂直速度</label><b id="i-vs">--</b></div>
+        <div><label>经纬度</label><b id="i-pos">--</b></div>
+        <div><label>数据延迟</label><b id="i-delay">--</b></div>
+      </div>
+    </div>
+
+    <!-- 悬浮按钮 -->
+    <div class="fabs">
+      <button id="recenter-btn" class="fab" title="回到飞机位置">🎯</button>
+      <button id="settings-btn" class="fab" title="设置">⚙</button>
+    </div>
+
+    <!-- 通讯模式设置面板（§6.4） -->
+    <div id="settings-panel" class="drawer" hidden>
+      <div class="drawer-head">
+        <h3>设置</h3>
+        <button id="settings-close" class="icon-btn" title="关闭">✕</button>
+      </div>
+
+      <section class="drawer-section">
+        <label class="radio-row">
+          <input type="radio" name="mode" value="webapi" />
+          <span>X-Plane Web API（推荐，需 12.1.1+）</span>
+        </label>
+        <div class="mode-params" id="webapi-params">
+          <div class="field-row">
+            <label for="webapi-host">Host</label>
+            <input id="webapi-host" type="text" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="field-row">
+            <label for="webapi-port">Port</label>
+            <input id="webapi-port" type="number" min="1" max="65535" />
+          </div>
+        </div>
+
+        <label class="radio-row">
+          <input type="radio" name="mode" value="udp" />
+          <span>UDP 广播（兼容旧版本）</span>
+        </label>
+        <div class="mode-params" id="udp-params">
+          <div class="field-row">
+            <label for="udp-port">监听端口</label>
+            <input id="udp-port" type="number" min="1" max="65535" />
+          </div>
+          <p class="hint">请确认已在 X-Plane 的 Settings → Data Output 中将数据发送到本机此端口</p>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <div class="conn-line">连接状态：<span id="conn-indicator">🔴 未连接</span></div>
+        <div class="conn-line">最近数据：<span id="conn-last">--</span></div>
+      </section>
+
+      <div class="drawer-actions">
+        <button id="settings-save" class="btn-primary">保存并切换</button>
+        <button id="settings-cancel" class="btn-plain">取消</button>
+        <div id="settings-error" class="error"></div>
+      </div>
+    </div>
+
+    <!-- 访问口令输入层（§9，启用 ACCESS_TOKEN 时出现） -->
+    <div id="auth-overlay" class="auth-overlay" hidden>
+      <div class="auth-card">
+        <h3>访问口令</h3>
+        <p class="hint">本服务已启用访问口令，请输入后继续</p>
+        <input id="auth-token" type="password" placeholder="访问口令" autocomplete="off" />
+        <div id="auth-error" class="error"></div>
+        <button id="auth-submit" class="btn-primary">进入</button>
+      </div>
+    </div>
+
+    <div id="toast" hidden></div>
+
+    <script src="/vendor/leaflet/leaflet.js"></script>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 顶视图飞机剪影，机头朝上（北），供 CSS rotate(heading) 使用 -->
+  <path d="M32 2 L36 12 L36 24 L58 40 L58 46 L36 38 L36 50 L44 58 L44 62 L32 58 L20 62 L20 58 L28 50 L28 38 L6 46 L6 40 L28 24 L28 12 Z"
+        fill="#1e6fd9" stroke="#0d3f8f" stroke-width="1.5" stroke-linejoin="round"/>
+  <circle cx="32" cy="18" r="3" fill="#e8f1ff"/>
+</svg>

@@ -1,0 +1,362 @@
+/* 前端样式（设计文档 §6 / §15.4.7）
+   —— 全屏地图 + 悬浮面板 + 无飞行灰色禁用样式 + 响应式（768px 断点） */
+
+:root {
+  --accent: #1e6fd9;
+  --amber: #f59e0b;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --text: #1a1a1a;
+  --text-dim: #999;
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--text);
+  background: #dfe6ee;
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  transition: filter 0.3s ease;
+}
+
+/* —— 无飞行状态：地图置灰变暗（§6.6.1 / §6.6.3）。保持可拖动缩放 —— */
+#map.map-disabled {
+  filter: grayscale(100%) brightness(0.85);
+  pointer-events: auto;
+}
+
+/* —— 状态提示条 —— */
+.banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: none;
+  max-width: min(92vw, 720px);
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  background: var(--amber);
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.5;
+  box-shadow: var(--shadow);
+  transition: opacity 0.3s ease;
+}
+.banner.visible {
+  display: flex;
+}
+.banner.dim {
+  background: rgba(20, 20, 20, 0.75);
+  color: #fff;
+}
+
+/* —— 悬浮面板通用 —— */
+.panel {
+  position: absolute;
+  z-index: 1000;
+  background: var(--panel-bg);
+  backdrop-filter: blur(6px);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+}
+
+/* 信息面板（右上） */
+#info-panel {
+  top: 12px;
+  right: 64px;
+  min-width: 230px;
+  transition: opacity 0.3s ease;
+}
+#info-panel.inactive {
+  color: var(--text-dim);
+}
+.info-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+  font-size: 13px;
+}
+.info-grid label {
+  display: block;
+  color: #666;
+  font-size: 11px;
+}
+.info-grid b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 局域网二维码卡片（左上） */
+#lan-box {
+  top: 12px;
+  left: 12px;
+  max-width: 240px;
+  font-size: 13px;
+}
+#lan-box summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+.lan-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lan-item img {
+  width: 130px;
+  height: 130px;
+  display: block;
+  border-radius: 8px;
+  background: #fff;
+  padding: 4px;
+}
+.lan-item .url {
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.lan-item .iface {
+  color: #777;
+  font-size: 11px;
+}
+
+/* 悬浮按钮 */
+.fabs {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fab {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
+  font-size: 18px;
+  cursor: pointer;
+}
+.fab:active {
+  transform: scale(0.94);
+}
+
+/* —— 设置抽屉（§6.4） —— */
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1300;
+  width: min(360px, 92vw);
+  background: #fff;
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.2);
+  padding: 16px;
+  overflow-y: auto;
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.drawer-head h3 {
+  margin: 0;
+}
+.icon-btn {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #555;
+}
+.drawer-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+  font-size: 14px;
+}
+.radio-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+  cursor: pointer;
+}
+.mode-params {
+  margin: 4px 0 12px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.2s;
+}
+.mode-params.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.field-row label {
+  width: 76px;
+  color: #555;
+}
+.field-row input {
+  flex: 1;
+  padding: 7px 9px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.hint {
+  color: #888;
+  font-size: 12px;
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+.conn-line {
+  margin: 4px 0;
+  color: #444;
+}
+.drawer-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.btn-plain {
+  padding: 9px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  color: #444;
+  cursor: pointer;
+}
+.error {
+  color: #c0392b;
+  font-size: 13px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* —— 访问口令层 —— */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auth-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 22px;
+  width: min(320px, 88vw);
+  box-shadow: var(--shadow);
+}
+.auth-card h3 {
+  margin: 0 0 6px;
+}
+.auth-card input {
+  width: 100%;
+  margin: 10px 0;
+  padding: 9px 11px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.auth-card .btn-primary {
+  width: 100%;
+}
+
+/* —— 轻提示 —— */
+#toast {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1500;
+  padding: 9px 20px;
+  border-radius: 999px;
+  background: rgba(20, 20, 20, 0.82);
+  color: #fff;
+  font-size: 13px;
+}
+
+/* 飞机图标（divIcon 内的 img，随 heading 旋转） */
+.plane-icon {
+  transition: none;
+}
+.plane-icon img {
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+/* —— 响应式：窄屏（手机/平板竖屏）—— */
+@media (max-width: 768px) {
+  #lan-box {
+    max-width: 200px;
+  }
+  #info-panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+  .info-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  #info-panel .info-grid div:nth-child(n + 5) {
+    display: none;
+  } /* 窄屏只保留核心 4 项 */
+}
