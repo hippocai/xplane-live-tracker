@@ -96,6 +96,8 @@ function switchProvider(provider) {
     center: map.getCenter(),
     zoom: map.getZoom(),
   }
+  // 显式移除航迹层（虽然整张地图销毁时 Leaflet 会连带清理，显式做避免依赖实现细节）
+  for (const line of polylines) line?.remove?.()
   map.remove()
   map = null
   marker = null

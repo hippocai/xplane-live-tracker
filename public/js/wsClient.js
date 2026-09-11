@@ -42,7 +42,8 @@ export function connect({ onPosition, onStatus, onOpen, onClose, onAuthRequired,
       else if (msg.type === 'xplane_status') onStatus?.(msg.data)
       else if (msg.type === 'auth_required') {
         onAuthRequired?.(msg.data)
-        close() // 服务端也会断开，这里主动清理并停止重连，等用户输入口令后再连
+        // 停止自动重连（否则会带旧 token 无限重连触发循环），等用户重新输入口令后 reopen
+        cleanup()
       }
     }
 
@@ -53,6 +54,14 @@ export function connect({ onPosition, onStatus, onOpen, onClose, onAuthRequired,
       scheduleReconnect()
     }
     // onerror 后必然触发 onclose，此处无需额外处理
+  }
+
+  /** 主动清理：置"用户关闭"标记、停掉一切定时器并断开当前连接 */
+  function cleanup() {
+    closedByUser = true
+    clearInterval(pingTimer)
+    clearTimeout(reconnectTimer)
+    if (ws) ws.close()
   }
 
   function scheduleReconnect() {
@@ -67,12 +76,7 @@ export function connect({ onPosition, onStatus, onOpen, onClose, onAuthRequired,
     send(obj) {
       if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj))
     },
-    close() {
-      closedByUser = true
-      clearInterval(pingTimer)
-      clearTimeout(reconnectTimer)
-      if (ws) ws.close()
-    },
+    close: cleanup,
     /** 重置"用户主动关闭"标记并立即重连（口令输入正确后调用） */
     reopen() {
       closedByUser = false
