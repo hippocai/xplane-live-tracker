@@ -20,7 +20,16 @@ const publicJsDir = path.resolve(
 )
 
 // app.js 依赖的控制器方法（须存在于 initMap() 返回的 api 对象上）
-const API_METHODS = ['updatePosition', 'setFlightActive', 'setFollowMode', 'recenter', 'loadTrack']
+const API_METHODS = [
+  'updatePosition',
+  'setFlightActive',
+  'setFollowMode',
+  'recenter',
+  'loadTrack',
+  'setBaiduAutoSwitch',
+  'getBaiduAutoSwitch',
+  'isFollowing',
+]
 
 test('mapController.api 具备 app.js 依赖的全部方法', () => {
   assert.equal(typeof mapController.initMap, 'function')

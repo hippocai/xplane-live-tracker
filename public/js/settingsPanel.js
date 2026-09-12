@@ -20,20 +20,27 @@ function readPort(inputId, fallback) {
 }
 
 /**
- * @param {{onStatusUpdate: Function}} opts 状态更新回调（供连接指示灯刷新）
+ * @param {{onStatusUpdate: Function, getMapSettings?: Function,
+ *          onMapSettings?: Function}} opts
+ * onStatusUpdate: 状态更新回调（供连接指示灯刷新）
+ * getMapSettings/onMapSettings: 地图选项（百度自动切换/跟随飞机）——
+ *   打开面板时读取当前值回填复选框，勾选变更立即回调生效（无需"保存"）
  */
-export function initSettingsPanel({ onStatusUpdate }) {
+export function initSettingsPanel({ onStatusUpdate, getMapSettings, onMapSettings }) {
   const panel = document.getElementById('settings-panel')
   const btnOpen = document.getElementById('settings-btn')
   const btnClose = document.getElementById('settings-close')
   const btnCancel = document.getElementById('settings-cancel')
   const btnSave = document.getElementById('settings-save')
   const errBox = document.getElementById('settings-error')
+  const chkBaiduAuto = document.getElementById('opt-baidu-auto')
+  const chkFollow = document.getElementById('opt-follow')
   const radios = () => panel.querySelectorAll('input[name="mode"]')
 
   btnOpen.addEventListener('click', async () => {
     panel.hidden = false
     errBox.textContent = ''
+    fillMapSettings()
     await fillForm()
   })
   btnClose.addEventListener('click', () => (panel.hidden = true))
@@ -43,6 +50,12 @@ export function initSettingsPanel({ onStatusUpdate }) {
   for (const radio of radios()) {
     radio.addEventListener('change', () => syncParamGroups())
   }
+
+  // 地图选项：勾选变更立即生效（这些是本机显示偏好，不涉及后端连接）
+  chkBaiduAuto?.addEventListener('change', () =>
+    onMapSettings?.({ baiduAuto: chkBaiduAuto.checked }),
+  )
+  chkFollow?.addEventListener('change', () => onMapSettings?.({ follow: chkFollow.checked }))
 
   btnSave.addEventListener('click', async () => {
     if (busy) return
@@ -93,6 +106,14 @@ export function initSettingsPanel({ onStatusUpdate }) {
     const mode = panel.querySelector('input[name="mode"]:checked')?.value
     document.getElementById('webapi-params').classList.toggle('disabled', mode !== 'webapi')
     document.getElementById('udp-params').classList.toggle('disabled', mode !== 'udp')
+  }
+
+  /** 地图选项回填：以地图控制器当前实际状态为准（拖动地图等也会改变"跟随"） */
+  function fillMapSettings() {
+    if (!getMapSettings || !chkBaiduAuto || !chkFollow) return
+    const ms = getMapSettings()
+    chkBaiduAuto.checked = ms.baiduAuto !== false
+    chkFollow.checked = Boolean(ms.follow)
   }
 
   async function fillForm() {

@@ -19,6 +19,25 @@ function makeFakeL() {
         this.k = [a, b, c, d]
       }
     },
+    Util: {
+      template: (url, data) => url.replace(/\{(\w+)\}/g, (m, k) => data[k] ?? m),
+    },
+    // createBaiduTileLayer(L) 用到：extend 拿到含 getTileUrl 的原型
+    TileLayer: {
+      extend(proto) {
+        return function FakeTileLayer(url, options = {}) {
+          this._url = url
+          this.options = options
+          this._getSubdomain = () => '0'
+          this._getZoomForUrl = () => this._zoomForUrl ?? 12
+          this.getTileUrl = proto.getTileUrl
+          this.addTo = () => {
+            created.tiles.push({ url, layer: this })
+            return this
+          }
+        }
+      },
+    },
     point: (x, y) => ({ x, y }),
     bounds: (a, b) => ({ min: a, max: b }),
     latLng: (lat, lng) => ({ lat, lng }),
@@ -29,6 +48,13 @@ function makeFakeL() {
       m.zoom = null
       m.pannedTo = []
       m.handlers = {}
+      m.zoomControl = {
+        position: null,
+        setPosition(p) {
+          this.position = p
+          return this
+        },
+      }
       m.setView = (c, z) => {
         m.center = c
         m.zoom = z
@@ -187,4 +213,34 @@ test('用户拖动地图后关闭自动跟随', () => {
   m.handlers.dragstart[0]()
   api.updatePosition(pos(40.01, 116.61))
   assert.equal(m.pannedTo.length, before, '关闭跟随后不应再 panTo')
+})
+
+test('缩放控件位于右下角（避开左上角局域网地址/二维码卡片）', () => {
+  for (const m of created.maps) {
+    assert.equal(m.zoomControl.position, 'bottomright')
+  }
+})
+
+test('百度瓦片 y 翻转：图层实际请求 y = -leaflet_y - 1', () => {
+  const baiduEntry = created.tiles.find((t) => t.url.includes('bdimg.com'))
+  assert.ok(baiduEntry?.layer, '应已创建百度瓦片图层')
+  // 北京 z12：Leaflet y=-293（北半球为负）→ 百度 y=292（真实瓦片，实证见 baiduCrs.js 注释）
+  const url = baiduEntry.layer.getTileUrl({ x: 791, y: -293, z: 12 })
+  assert.ok(url.includes('x=791') && url.includes('y=292') && url.includes('z=12'), url)
+})
+
+test('关闭"自动切百度"：立即切回 OSM，且境内位置不再触发切换', () => {
+  assert.equal(api.getBaiduAutoSwitch(), true)
+  api.setBaiduAutoSwitch(false) // 当前在百度底图 → 应立即切回
+  assert.ok(created.tiles.at(-1).url.includes('openstreetmap'))
+  api.updatePosition(pos(40.02, 116.62)) // 境内点，但自动切换已关
+  assert.ok(created.tiles.at(-1).url.includes('openstreetmap'), '关闭后不应自动切百度')
+})
+
+test('重新打开自动切换：最后位置在境内立即切百度；跟随状态可查询', () => {
+  api.setBaiduAutoSwitch(true)
+  assert.ok(created.tiles.at(-1).url.includes('bdimg.com'))
+  assert.equal(api.isFollowing(), false) // 前面用例 dragstart 已关闭跟随
+  api.setFollowMode(true)
+  assert.equal(api.isFollowing(), true)
 })

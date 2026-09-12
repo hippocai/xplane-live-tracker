@@ -30,9 +30,27 @@ async function boot() {
 
   mapApi = map.initMap(document.getElementById('map'), lastConfig.mapProvider, {
     trackEnabled: lastConfig.trackEnabled !== false,
+    baiduAuto: readBaiduAutoPref(), // 默认开；关闭过则记住（localStorage）
   })
 
-  initSettingsPanel({ onStatusUpdate: onStatus })
+  initSettingsPanel({
+    onStatusUpdate: onStatus,
+    getMapSettings: () => ({
+      baiduAuto: mapApi?.getBaiduAutoSwitch() ?? true,
+      follow: mapApi?.isFollowing() ?? true,
+    }),
+    onMapSettings: ({ baiduAuto, follow }) => {
+      if (baiduAuto !== undefined) {
+        mapApi?.setBaiduAutoSwitch(baiduAuto)
+        try {
+          localStorage.setItem('xplt_baidu_auto', baiduAuto ? '1' : '0')
+        } catch {
+          /* localStorage 不可用时忽略 */
+        }
+      }
+      if (follow !== undefined) mapApi?.setFollowMode(follow)
+    },
+  })
   bindButtons()
   renderLanBox(lastConfig.lanUrls || [])
 
@@ -64,6 +82,15 @@ function onStatus(status) {
   mapApi?.setFlightActive(Boolean(status.flightActive))
   ui.updateStatusBanner(status)
   updateConnIndicator(status)
+}
+
+/** 读取"进入大陆自动切百度"偏好：默认开，仅显式关闭过才返回 false */
+function readBaiduAutoPref() {
+  try {
+    return localStorage.getItem('xplt_baidu_auto') !== '0'
+  } catch {
+    return true
+  }
 }
 
 function bindButtons() {

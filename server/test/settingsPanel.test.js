@@ -30,6 +30,8 @@ for (const id of [
   'udp-params',
   'conn-indicator',
   'conn-last',
+  'opt-baidu-auto',
+  'opt-follow',
   'toast',
 ]) {
   els[id] = fakeElement(id)
@@ -55,7 +57,16 @@ globalThis.fetch = async (input, init = {}) => {
 }
 
 const statusUpdates = []
-initSettingsPanel({ onStatusUpdate: (s) => statusUpdates.push(s) })
+const mockMap = { baiduAuto: true, follow: true }
+const mapSettingsChanges = []
+initSettingsPanel({
+  onStatusUpdate: (s) => statusUpdates.push(s),
+  getMapSettings: () => ({ ...mockMap }),
+  onMapSettings: (s) => {
+    Object.assign(mockMap, s)
+    mapSettingsChanges.push(s)
+  },
+})
 const postCalls = () => calls.filter((c) => c.init.method === 'POST')
 
 // 模拟 index.html 输入框的默认 value 属性
@@ -179,4 +190,21 @@ test('连接指示灯三态：已连接 / 曾有数据 / 从未连接', () => {
   assert.equal(els['conn-indicator'].textContent, '🟡 连接中 / 未连接')
   updateConnIndicator({ connected: false, webapi: {}, udp: {} })
   assert.equal(els['conn-indicator'].textContent, '🔴 未连接')
+})
+
+test('地图选项：打开面板回填当前值，勾选变更立即回调生效', async () => {
+  mockMap.baiduAuto = false
+  mockMap.follow = false
+  panel.hidden = false
+  els['settings-btn'].dispatch('click')
+  await tick()
+  assert.equal(els['opt-baidu-auto'].checked, false, '应回填地图控制器当前值')
+  assert.equal(els['opt-follow'].checked, false)
+  // 勾选变更立即回调（无需"保存并切换"）
+  els['opt-baidu-auto'].checked = true
+  els['opt-baidu-auto'].dispatch('change')
+  assert.deepEqual(mapSettingsChanges.at(-1), { baiduAuto: true })
+  els['opt-follow'].checked = true
+  els['opt-follow'].dispatch('change')
+  assert.deepEqual(mapSettingsChanges.at(-1), { follow: true })
 })
