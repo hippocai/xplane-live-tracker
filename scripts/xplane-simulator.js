@@ -30,20 +30,35 @@ function parseArgs(argv) {
     // （3600km/h，见 trackStore.JUMP_SPEED_KMH）之内。倍速再高会让每个点都被判为
     // "传送跳变"，航迹将完全断线——那是检测机制在正确工作，不是模拟器 bug。
     speed: 4,
-    tail: 'B-20AC'
+    tail: 'B-20AC',
   }
   for (let i = 2; i < argv.length; i++) {
     const key = argv[i]
     const val = () => argv[++i]
     switch (key) {
-      case '--mode': args.mode = val(); break
-      case '--scenario': args.scenario = val(); break
-      case '--hz': args.hz = Number(val()); break
-      case '--http-port': args.httpPort = Number(val()); break
-      case '--udp-port': args.udpPort = Number(val()); break
-      case '--speed': args.speed = Number(val()); break
-      case '--tail': args.tail = val(); break
-      default: console.warn(`[!!] 未知参数 ${key}，已忽略`)
+      case '--mode':
+        args.mode = val()
+        break
+      case '--scenario':
+        args.scenario = val()
+        break
+      case '--hz':
+        args.hz = Number(val())
+        break
+      case '--http-port':
+        args.httpPort = Number(val())
+        break
+      case '--udp-port':
+        args.udpPort = Number(val())
+        break
+      case '--speed':
+        args.speed = Number(val())
+        break
+      case '--tail':
+        args.tail = val()
+        break
+      default:
+        console.warn(`[!!] 未知参数 ${key}，已忽略`)
     }
   }
   return args
@@ -60,8 +75,8 @@ const SCENARIOS = {
       { name: '东京成田', lat: 35.772, lon: 140.393, alt: 0, speed: 0 },
       { name: '太平洋上空', lat: 34.0, lon: 136.5, alt: 10000, speed: 240 },
       { name: '东海上空', lat: 32.5, lon: 128.0, alt: 10000, speed: 240 },
-      { name: '上海浦东', lat: 31.15, lon: 121.8, alt: 0, speed: 240 }
-    ]
+      { name: '上海浦东', lat: 31.15, lon: 121.8, alt: 0, speed: 240 },
+    ],
   },
   'exit-china': {
     desc: '上海 → 东京（从判定矩形内飞出，验证恢复 OSM）',
@@ -69,8 +84,8 @@ const SCENARIOS = {
       { name: '上海浦东', lat: 31.15, lon: 121.8, alt: 0, speed: 0 },
       { name: '东海上空', lat: 32.5, lon: 128.0, alt: 10000, speed: 240 },
       { name: '太平洋上空', lat: 34.0, lon: 136.5, alt: 10000, speed: 240 },
-      { name: '东京成田', lat: 35.772, lon: 140.393, alt: 0, speed: 240 }
-    ]
+      { name: '东京成田', lat: 35.772, lon: 140.393, alt: 0, speed: 240 },
+    ],
   },
   domestic: {
     desc: '上海 → 北京（全程境内，验证常规数据流与百度底图保持）',
@@ -78,21 +93,21 @@ const SCENARIOS = {
       { name: '上海虹桥', lat: 31.198, lon: 121.336, alt: 0, speed: 0 },
       { name: '江淮上空', lat: 33.5, lon: 119.0, alt: 10000, speed: 240 },
       { name: '华北上空', lat: 37.0, lon: 117.5, alt: 10000, speed: 240 },
-      { name: '北京首都', lat: 40.08, lon: 116.58, alt: 0, speed: 240 }
-    ]
+      { name: '北京首都', lat: 40.08, lon: 116.58, alt: 0, speed: 240 },
+    ],
   },
   circle: {
     desc: '绕北京上空盘旋（无限循环）',
-    circle: { lat: 39.9, lon: 116.6, radiusDeg: 0.35, alt: 1200, speedMps: 80 }
+    circle: { lat: 39.9, lon: 116.6, radiusDeg: 0.35, alt: 1200, speedMps: 80 },
   },
   'cross-boundary': {
     desc: '东海 → 大阪湾（短途穿越判定边界 135.1°E，快速验证底图切出）',
     wps: [
       { name: '东海上空', lat: 32.8, lon: 133.5, alt: 9500, speed: 0 },
       { name: '九州以南', lat: 33.6, lon: 134.8, alt: 9500, speed: 240 },
-      { name: '大阪湾', lat: 34.6, lon: 136.4, alt: 9500, speed: 240 }
-    ]
-  }
+      { name: '大阪湾', lat: 34.6, lon: 136.4, alt: 9500, speed: 240 },
+    ],
+  },
 }
 
 // ---------- 飞行模型（推算定位，非精密导航，够联调用） ----------
@@ -143,7 +158,7 @@ class FlightModel {
       alt: c.alt,
       gsMps: c.speedMps,
       heading: ((this.theta * 180) / Math.PI + 90) % 360, // 逆时针切向
-      vsMps: 0
+      vsMps: 0,
     }
   }
 
@@ -174,7 +189,7 @@ class FlightModel {
       const altBefore = this.alt
       this.pos = {
         lat: this.pos.lat + (dist * Math.cos(brg)) / M_PER_DEG_LAT,
-        lon: this.pos.lon + (dist * Math.sin(brg)) / (M_PER_DEG_LAT * Math.cos(this.pos.lat * DEG))
+        lon: this.pos.lon + (dist * Math.sin(brg)) / (M_PER_DEG_LAT * Math.cos(this.pos.lat * DEG)),
       }
       // 高度按腿进度线性过渡
       const progress = this.legTotal > 0 ? 1 - this.legRemaining / this.legTotal : 1
@@ -186,7 +201,7 @@ class FlightModel {
         alt: this.alt,
         gsMps: to.speed,
         heading: (brg / DEG + 360) % 360,
-        vsMps: (this.alt - altBefore) / dtSim
+        vsMps: (this.alt - altBefore) / dtSim,
       }
       if (this.legRemaining <= 0) {
         if (this.leg + 2 < this.scenario.wps.length) {
@@ -214,7 +229,7 @@ class FlightModel {
       vsMps: s.vsMps,
       vsFpm: s.vsMps * FPM_PER_MPS,
       pitch: this.pitch,
-      roll: this.roll
+      roll: this.roll,
     }
   }
 
@@ -222,8 +237,12 @@ class FlightModel {
   teleport() {
     const current = this.scenario.circle ? this.state : this.pos
     const inChina = isRoughlyChina(current)
-    const target = inChina ? { lat: 40.71, lon: -74.01, alt: 10500 } : { lat: 39.9, lon: 116.6, alt: 10000 }
-    console.log(`[跳变] 传送：${current.lat.toFixed(2)},${current.lon.toFixed(2)} -> ${target.lat},${target.lon}`)
+    const target = inChina
+      ? { lat: 40.71, lon: -74.01, alt: 10500 }
+      : { lat: 39.9, lon: 116.6, alt: 10000 }
+    console.log(
+      `[跳变] 传送：${current.lat.toFixed(2)},${current.lon.toFixed(2)} -> ${target.lat},${target.lon}`,
+    )
     this.pos = { lat: target.lat, lon: target.lon }
     this.alt = target.alt
     if (this.scenario.circle) {
@@ -238,7 +257,7 @@ class FlightModel {
         ...this.scenario.wps[this.leg],
         lat: target.lat,
         lon: target.lon,
-        alt: target.alt
+        alt: target.alt,
       }
       this.#startLeg(this.leg)
     }
@@ -253,7 +272,7 @@ function bearing(lat1, lon1, lat2, lon2) {
   const Δλ = (lon2 - lon1) * DEG
   return Math.atan2(
     Math.sin(Δλ) * Math.cos(φ2),
-    Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)
+    Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ),
   )
 }
 
@@ -274,7 +293,7 @@ const DATAREFS = [
   { id: 8, name: 'sim/flightmodel/position/phi', type: 'float' },
   { id: 9, name: 'sim/flightmodel/position/theta', type: 'float' },
   { id: 10, name: 'sim/flightmodel/position/vh_ind_fpm', type: 'float' },
-  { id: 11, name: 'sim/aircraft/view/acf_tailnum', type: 'string' }
+  { id: 11, name: 'sim/aircraft/view/acf_tailnum', type: 'string' },
 ]
 const DATAREF_BY_NAME = new Map(DATAREFS.map((d) => [d.name, d]))
 
@@ -301,7 +320,9 @@ if (args.mode === 'webapi' || args.mode === 'both') {
     const url = new URL(req.url, `http://127.0.0.1:${args.httpPort}`)
     if (url.pathname === '/api/v2/capabilities') {
       res.writeHead(200, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ name: 'X-Plane 12 (simulator)', version: '4.1.0', sdk_version: '4.1.0' }))
+      res.end(
+        JSON.stringify({ name: 'X-Plane 12 (simulator)', version: '4.1.0', sdk_version: '4.1.0' }),
+      )
       return
     }
     if (url.pathname === '/api/v2/datarefs') {
@@ -327,7 +348,7 @@ if (args.mode === 'webapi' || args.mode === 'both') {
           subscriptions.set(ws, {
             ids: new Set(msg.data?.ids || []),
             frequency: msg.data?.frequency || args.hz,
-            requestId: msg.request_id ?? 1
+            requestId: msg.request_id ?? 1,
           })
           console.log(`[订阅] ${msg.data?.ids?.length ?? 0} 个 dataref @ ${msg.data?.frequency}Hz`)
         }
@@ -346,7 +367,9 @@ if (args.mode === 'webapi' || args.mode === 'both') {
   })
   httpServer.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`[!!] 端口 ${args.httpPort} 被占用（真实 X-Plane 在运行？）。请用 --http-port 换端口，或关闭 X-Plane。`)
+      console.error(
+        `[!!] 端口 ${args.httpPort} 被占用（真实 X-Plane 在运行？）。请用 --http-port 换端口，或关闭 X-Plane。`,
+      )
       process.exit(1)
     }
     throw err
@@ -389,51 +412,54 @@ function currentValues(st) {
     { id: 8, value: st.roll },
     { id: 9, value: st.pitch },
     { id: 10, value: st.vsFpm },
-    { id: 11, value: args.tail }
+    { id: 11, value: args.tail },
   ]
 }
 
 // —— 主节拍：推进飞行模型 + 推送数据（暂停时冻结）——
 let tickCount = 0
-const timer = setInterval(() => {
-  if (paused) return
-  const dtSim = args.speed / args.hz // 每个节拍推进的模拟秒数
-  const st = model.step(dtSim)
-  tickCount++
+const timer = setInterval(
+  () => {
+    if (paused) return
+    const dtSim = args.speed / args.hz // 每个节拍推进的模拟秒数
+    const st = model.step(dtSim)
+    tickCount++
 
-  // WS 推送：按各订阅者请求的频率节流（与真实 Web API 行为一致）
-  if (wss) {
-    for (const [ws, sub] of subscriptions) {
-      if (ws.readyState !== ws.OPEN) continue
-      const every = Math.max(1, Math.round(args.hz / Math.min(sub.frequency, args.hz)))
-      if (tickCount % every !== 0) continue
-      const values = currentValues(st).filter((v) => sub.ids.has(v.id))
-      ws.send(
-        JSON.stringify({
-          type: 'dataref_values',
-          request_id: sub.requestId,
-          data: { values, timestamp: Date.now() }
-        })
-      )
-      wsSendCount++
+    // WS 推送：按各订阅者请求的频率节流（与真实 Web API 行为一致）
+    if (wss) {
+      for (const [ws, sub] of subscriptions) {
+        if (ws.readyState !== ws.OPEN) continue
+        const every = Math.max(1, Math.round(args.hz / Math.min(sub.frequency, args.hz)))
+        if (tickCount % every !== 0) continue
+        const values = currentValues(st).filter((v) => sub.ids.has(v.id))
+        ws.send(
+          JSON.stringify({
+            type: 'dataref_values',
+            request_id: sub.requestId,
+            data: { values, timestamp: Date.now() },
+          }),
+        )
+        wsSendCount++
+      }
     }
-  }
 
-  // UDP 推送
-  if (udpSocket) {
-    const packet = buildDataPacket(st)
-    udpSocket.send(packet, args.udpPort, '127.0.0.1', (err) => {
-      if (!err) udpSendCount++
-    })
-  }
-}, Math.round(1000 / args.hz))
+    // UDP 推送
+    if (udpSocket) {
+      const packet = buildDataPacket(st)
+      udpSocket.send(packet, args.udpPort, '127.0.0.1', (err) => {
+        if (!err) udpSendCount++
+      })
+    }
+  },
+  Math.round(1000 / args.hz),
+)
 timer.unref?.()
 
 // —— 状态打印 ——
 const statusTimer = setInterval(() => {
   const st = model.snapshot()
   console.log(
-    `[飞机] ${st.lat.toFixed(4)}, ${st.lon.toFixed(4)}  高度 ${st.altMsl.toFixed(0)}m  地速 ${(st.gsMps * KT_PER_MPS).toFixed(0)}kt  航向 ${st.heading.toFixed(0)}°  [ws:${wsSendCount} udp:${udpSendCount}${paused ? ' [已暂停]' : ''}]`
+    `[飞机] ${st.lat.toFixed(4)}, ${st.lon.toFixed(4)}  高度 ${st.altMsl.toFixed(0)}m  地速 ${(st.gsMps * KT_PER_MPS).toFixed(0)}kt  航向 ${st.heading.toFixed(0)}°  [ws:${wsSendCount} udp:${udpSendCount}${paused ? ' [已暂停]' : ''}]`,
   )
 }, 5000)
 statusTimer.unref?.()
@@ -441,7 +467,9 @@ statusTimer.unref?.()
 // —— 控制逻辑（stdin 命令与 HTTP 端点共用）——
 function doPause() {
   paused = !paused
-  console.log(paused ? '[暂停] 数据推送已暂停（后端将在静默超时后判定"无飞行"）' : '[恢复] 数据推送已恢复')
+  console.log(
+    paused ? '[暂停] 数据推送已暂停（后端将在静默超时后判定"无飞行"）' : '[恢复] 数据推送已恢复',
+  )
   return paused
 }
 
@@ -480,7 +508,8 @@ function handleControlEndpoint(url, res) {
     return true
   }
   switch (url.pathname) {
-    case '/sim/pause': return reply({ paused: doPause() })
+    case '/sim/pause':
+      return reply({ paused: doPause() })
     case '/sim/resume':
       if (paused) doPause()
       return reply({ paused })
@@ -518,9 +547,13 @@ console.log('[OK] X-Plane 协议模拟器已启动')
 console.log(`  模式: ${args.mode}  场景: ${args.scenario} —— ${scenario.desc}`)
 console.log(`  推送频率: ${args.hz}Hz  时间倍速: ${args.speed}x（1 实秒 = ${args.speed} 模拟秒）`)
 if (args.mode === 'webapi' || args.mode === 'both') {
-  console.log(`  Web API: http://127.0.0.1:${args.httpPort} （后端设置面板选 Web API 模式即可连上）`)
+  console.log(
+    `  Web API: http://127.0.0.1:${args.httpPort} （后端设置面板选 Web API 模式即可连上）`,
+  )
 }
 if (args.mode === 'udp' || args.mode === 'both') {
-  console.log(`  UDP DATA → 127.0.0.1:${args.udpPort} （后端设置面板选 UDP 模式、监听 ${args.udpPort}）`)
+  console.log(
+    `  UDP DATA → 127.0.0.1:${args.udpPort} （后端设置面板选 UDP 模式、监听 ${args.udpPort}）`,
+  )
 }
 console.log('  命令: p=暂停/恢复  t=传送跳变  d=断开WebSocket  q=退出')
