@@ -348,6 +348,10 @@ body {
 
 /* —— 响应式：窄屏（手机/平板竖屏）—— */
 @media (max-width: 768px) {
+  /* 缩放控件已移到右下角，窄屏需抬高避开底部信息面板 */
+  .leaflet-bottom.leaflet-right {
+    bottom: 150px;
+  }
   #lan-box {
     max-width: 200px;
   }

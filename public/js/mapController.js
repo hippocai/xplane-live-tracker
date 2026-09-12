@@ -4,12 +4,7 @@
 // 飞机进入中国大陆时自动切换百度底图、离开后自动恢复（FR: 用户需求 2026-09）。
 // 坐标体系：所有对外坐标一律 WGS84；百度瓦片的 BD09 纠偏在 baiduCrs.js 内部完成。
 import { isMainlandChina } from './geo.js'
-import {
-  createBaiduCrs,
-  BAIDU_TILE_URL,
-  BAIDU_TILE_SUBDOMAINS,
-  BAIDU_ATTRIBUTION,
-} from './baiduCrs.js'
+import { createBaiduCrs, createBaiduTileLayer } from './baiduCrs.js'
 import { toast } from './ui.js'
 
 const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -28,6 +23,7 @@ let lastPosition = null
 let follow = true
 let flightActive = false
 let trackEnabled = true
+let baiduAuto = true // 进入大陆自动切百度（可在设置面板开关，默认开）
 let baseProvider = 'osm' // /api/config 指定的底图（google 目前兜底为 osm）
 let activeProvider = null // 当前实际使用的底图
 let containerEl = null
@@ -36,11 +32,12 @@ let containerEl = null
  * 初始化地图
  * @param {HTMLElement} container
  * @param {'osm'|'google'} provider
- * @param {{trackEnabled?: boolean}} [opts]
+ * @param {{trackEnabled?: boolean, baiduAuto?: boolean}} [opts]
  */
 export function initMap(container, provider = 'osm', opts = {}) {
   containerEl = container
   trackEnabled = opts.trackEnabled !== false
+  baiduAuto = opts.baiduAuto !== false
   // Google Maps 底图为设计文档 M8 可选项，v1 统一以 OSM 兜底
   baseProvider = provider === 'google' ? 'osm' : provider
   buildMap(baseProvider)
@@ -58,12 +55,10 @@ function buildMap(provider, restore = {}) {
   }
   if (useBaidu) mapOpts.crs = createBaiduCrs(L)
   map = L.map(containerEl, mapOpts)
+  // 缩放控件放右下角：默认左上角会与局域网地址/二维码卡片（#lan-box）重叠
+  map.zoomControl?.setPosition?.('bottomright')
   if (useBaidu) {
-    L.tileLayer(BAIDU_TILE_URL, {
-      subdomains: BAIDU_TILE_SUBDOMAINS,
-      maxZoom: 19,
-      attribution: BAIDU_ATTRIBUTION,
-    }).addTo(map)
+    createBaiduTileLayer(L).addTo(map)
   } else {
     L.tileLayer(OSM_URL, { maxZoom: 19, attribution: OSM_ATTR }).addTo(map)
   }
@@ -118,7 +113,7 @@ export const api = {
     if (!map || !flightActive || !pos) return
 
     // —— 底图区域自动切换（含迟滞：进入用精确边界，离开用外扩 0.3° 边界）——
-    if (activeProvider !== 'baidu' && isMainlandChina(pos.lat, pos.lon)) {
+    if (baiduAuto && activeProvider !== 'baidu' && isMainlandChina(pos.lat, pos.lon)) {
       switchProvider('baidu')
     } else if (activeProvider === 'baidu' && !isMainlandChina(pos.lat, pos.lon, EXIT_MARGIN_DEG)) {
       switchProvider(baseProvider)
@@ -207,9 +202,37 @@ export const api = {
     // 若最后已知位置在大陆境内，立即切百度底图（不等下一个 position 帧）
     const lastSeg = segments[segments.length - 1]
     const last = lastSeg?.[lastSeg.length - 1]
-    if (last && activeProvider !== 'baidu' && isMainlandChina(last[0], last[1])) {
+    if (baiduAuto && last && activeProvider !== 'baidu' && isMainlandChina(last[0], last[1])) {
       switchProvider('baidu')
     }
+  },
+
+  /**
+   * "进入大陆自动切百度"开关（默认开）。变更立即生效：
+   * 关闭时若正在百度底图 → 切回基础底图；开启时若最后位置在境内 → 立即切百度。
+   */
+  setBaiduAutoSwitch(on) {
+    baiduAuto = Boolean(on)
+    if (!map) return
+    if (!baiduAuto && activeProvider === 'baidu') {
+      switchProvider(baseProvider)
+    } else if (
+      baiduAuto &&
+      lastPosition &&
+      activeProvider !== 'baidu' &&
+      isMainlandChina(lastPosition.lat, lastPosition.lon)
+    ) {
+      switchProvider('baidu')
+    }
+  },
+
+  getBaiduAutoSwitch() {
+    return baiduAuto
+  },
+
+  /** 当前是否跟随飞机（拖动地图/置灰会自动关闭，recenter/开关恢复） */
+  isFollowing() {
+    return follow
   },
 }
 

@@ -39,3 +39,36 @@ export const BAIDU_TILE_URL =
   'https://maponline{s}.bdimg.com/onlinelabel/?qt=tile&x={x}&y={y}&z={z}&styles=pl&scaler=1&p=1'
 export const BAIDU_TILE_SUBDOMAINS = '0123'
 export const BAIDU_ATTRIBUTION = '&copy; <a href="https://map.baidu.com">百度地图</a>'
+
+// —— 百度瓦片 y 轴与 Leaflet 相反（关键坑，2026-09 实证）——
+// 本 CRS 的像素 y = -scale·y_MC（北为上），瓦片行号 L = floor(pixel_y/256) 对北半球为负；
+// 而百度服务器的 y 以赤道为 0 向北递增（大连/北京实测：z12 北京城 y=+292..296 为真实
+// 内容、y=-293 为空白瓦片；y=292 实为大兴青云店 39.65N、y=296 为昌平顺义交界 40.12N，
+// 与 floor(y_MC·2^(z-18)/256) 公式吻合）。若不翻转，请求到的全是南半球瓦片——
+// 表现为"飞机飘到澳大利亚"。
+// 两者的精确关系（y_MC·scale/256 非整数时恒成立）：baidu_y = -leaflet_y - 1
+export function baiduTileY(leafletY) {
+  return -leafletY - 1
+}
+
+/**
+ * 创建百度瓦片图层（不能用普通 L.tileLayer 模板：y 需要取负翻转）
+ * @param {typeof import('leaflet')} L Leaflet 全局
+ */
+export function createBaiduTileLayer(L) {
+  const BaiduTileLayer = L.TileLayer.extend({
+    getTileUrl(coords) {
+      return L.Util.template(this._url, {
+        s: this._getSubdomain(coords),
+        x: coords.x,
+        y: baiduTileY(coords.y),
+        z: this._getZoomForUrl(),
+      })
+    },
+  })
+  return new BaiduTileLayer(BAIDU_TILE_URL, {
+    subdomains: BAIDU_TILE_SUBDOMAINS,
+    maxZoom: 19,
+    attribution: BAIDU_ATTRIBUTION,
+  })
+}
