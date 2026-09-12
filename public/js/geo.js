@@ -166,3 +166,15 @@ export function isMainlandChina(lat, lng, margin = 0) {
   }
   return true
 }
+
+/** 两点大圆距离（km），供图层按视野半径取数。支持 {lat,lng} 与 {lat,lon} 两种形态 */
+export function haversineKm(a, b) {
+  const toRad = (d) => (d * Math.PI) / 180
+  const lng = (p) => (p.lng !== undefined ? p.lng : p.lon)
+  const dLat = toRad(b.lat - a.lat)
+  const dLon = toRad(lng(b) - lng(a))
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(s)))
+}

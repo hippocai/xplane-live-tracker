@@ -16,6 +16,8 @@ import { registerStatusRoute } from './routes/status.js'
 import { registerConfigRoute } from './routes/config.js'
 import { registerXplaneModeRoute } from './routes/xplaneMode.js'
 import { registerTrackRoute } from './routes/track.js'
+import { registerNavRoutes } from './routes/navpoints.js'
+import { initNavData } from './utils/navDataStore.js'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -39,6 +41,9 @@ await xplaneManager.start()
 xplaneManager.on('position', (pos) => {
   trackStore.push({ lat: pos.lat, lon: pos.lon, timestamp: pos.timestamp })
 })
+
+// 导航数据库（机场/导航台/航路点图层）后台加载，不阻塞服务启动
+initNavData(cfg.xplanePath).catch((err) => logger.error({ err }, '导航数据库初始化异常'))
 
 const app = express()
 app.disable('x-powered-by')
@@ -64,6 +69,7 @@ registerConfigRoute(app, { accessToken: cfg.accessToken })
 registerStatusRoute(app, xplaneManager)
 registerXplaneModeRoute(app, xplaneManager)
 registerTrackRoute(app)
+registerNavRoutes(app)
 
 const server = http.createServer(app)
 const wss = new WebSocketServer({ server, path: '/ws' })

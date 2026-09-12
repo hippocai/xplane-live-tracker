@@ -5,6 +5,7 @@ import { api, getToken, saveToken } from './api.js'
 import * as map from './mapController.js'
 import * as ui from './ui.js'
 import { initSettingsPanel, updateConnIndicator } from './settingsPanel.js'
+import { initNavLayers } from './navLayers.js'
 import { connect as connectWs } from './wsClient.js'
 
 let ws = null
@@ -52,6 +53,7 @@ async function boot() {
     },
   })
   bindButtons()
+  initNavUi()
   renderLanBox(lastConfig.lanUrls || [])
 
   openSocket()
@@ -95,6 +97,92 @@ function readBaiduAutoPref() {
 
 function bindButtons() {
   document.getElementById('recenter-btn')?.addEventListener('click', () => mapApi?.recenter())
+}
+
+// —— 导航图层 UI（🧭 按钮 + 弹层开关 + 设置里的数据源配置）——
+
+const LAYER_PREF_KEY = 'xplt_layers'
+const DEFAULT_LAYERS = { airport: true, navaid: true, fix: false }
+
+function readLayerPrefs() {
+  try {
+    return { ...DEFAULT_LAYERS, ...JSON.parse(localStorage.getItem(LAYER_PREF_KEY)) }
+  } catch {
+    return { ...DEFAULT_LAYERS }
+  }
+}
+
+function initNavUi() {
+  const navLayers = initNavLayers({
+    getMap: () => mapApi?.getMap(),
+    onMapRebuilt: (cb) => mapApi?.onMapRebuilt(cb),
+  })
+
+  // 🧭 按钮开关弹层
+  const panel = document.getElementById('layers-panel')
+  document.getElementById('layers-btn')?.addEventListener('click', () => {
+    panel.hidden = !panel.hidden
+  })
+
+  // 三个图层开关：立即生效并持久化
+  const boxes = { airport: 'layer-airport', navaid: 'layer-navaid', fix: 'layer-fix' }
+  const prefs = readLayerPrefs()
+  for (const [type, id] of Object.entries(boxes)) {
+    const box = document.getElementById(id)
+    if (!box) continue
+    box.checked = Boolean(prefs[type])
+    box.addEventListener('change', () => {
+      navLayers.setLayerEnabled(type, box.checked)
+      const next = readLayerPrefs()
+      next[type] = box.checked
+      try {
+        localStorage.setItem(LAYER_PREF_KEY, JSON.stringify(next))
+      } catch {
+        /* localStorage 不可用时忽略 */
+      }
+    })
+    navLayers.setLayerEnabled(type, Boolean(prefs[type]))
+  }
+
+  initNavConfigSection()
+}
+
+async function initNavConfigSection() {
+  const input = document.getElementById('nav-xplane-path')
+  const status = document.getElementById('nav-data-status')
+  const apply = document.getElementById('nav-apply')
+  const render = (s) => {
+    if (!status) return
+    if (s.loading) status.textContent = '正在加载…'
+    else if (s.error) status.textContent = `[!] ${s.error}`
+    else if (s.loaded) {
+      status.textContent = `已加载：机场 ${s.counts.airport} / 导航台 ${s.counts.navaid} / 航路点 ${s.counts.fix}`
+    } else status.textContent = '未加载'
+    // 弹层里的提示同步显示错误，方便发现"图层没数据"的原因
+    const popStatus = document.getElementById('nav-layer-status')
+    if (popStatus && s.error) popStatus.textContent = `[!] ${s.error}`
+  }
+  try {
+    render(await api('/api/nav-config'))
+  } catch {
+    /* 初始读取失败不打断页面 */
+  }
+  apply?.addEventListener('click', async () => {
+    apply.disabled = true
+    try {
+      render(
+        await api('/api/nav-config', {
+          method: 'POST',
+          body: JSON.stringify({ xplanePath: input?.value.trim() || '' }),
+        }),
+      )
+      ui.toast('导航数据已更新')
+    } catch (err) {
+      if (status) status.textContent = `[!] ${err.message}`
+    } finally {
+      apply.disabled = false
+    }
+  })
 }
 
 /** 历史航迹补画（§5.4：刷新页面后补画最近 N 分钟航迹） */

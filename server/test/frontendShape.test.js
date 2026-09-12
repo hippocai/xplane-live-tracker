@@ -29,6 +29,8 @@ const API_METHODS = [
   'setBaiduAutoSwitch',
   'getBaiduAutoSwitch',
   'isFollowing',
+  'getMap',
+  'onMapRebuilt',
 ]
 
 test('mapController.api 具备 app.js 依赖的全部方法', () => {

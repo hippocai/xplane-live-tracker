@@ -13,6 +13,7 @@ import {
   wgs84ToBaiduMC,
   baiduMCToWgs84,
   isMainlandChina,
+  haversineKm,
 } from '../../public/js/geo.js'
 
 // 百度通用插件（leaflet-tileLayer-baidugaode 等）使用的百度墨卡托定义
@@ -111,4 +112,11 @@ test('isMainlandChina margin：迟滞外扩生效', () => {
   // 主矩形南界 18.0：界外一点 margin=0 不命中，margin=0.3 命中
   assert.equal(isMainlandChina(17.9, 110.0), false)
   assert.equal(isMainlandChina(17.9, 110.0, 0.3), true)
+})
+
+test('haversineKm：北京-上海约 1067km，支持 lng/lon 两种字段', () => {
+  const d = haversineKm({ lat: 39.9073, lng: 116.3913 }, { lat: 31.2304, lon: 121.4737 })
+  assert.ok(Math.abs(d - 1067) < 15, `d=${d}`)
+  const d2 = haversineKm({ lat: 0, lng: 0 }, { lat: 0, lon: 1 }) // 赤道 1° ≈ 111.2km
+  assert.ok(Math.abs(d2 - 111.2) < 1, `d2=${d2}`)
 })

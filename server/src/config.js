@@ -18,6 +18,7 @@ export const PERSISTED_KEYS = [
   'flightStaleTimeoutMs',
   'updateHz',
   'trackMaxMinutes',
+  'xplanePath',
 ]
 
 export const defaultConfig = {
@@ -33,6 +34,9 @@ export const defaultConfig = {
   udp: {
     listenPort: intEnv('XPLANE_UDP_LISTEN_PORT', 49005),
   },
+
+  // X-Plane 安装目录（导航图层数据源；空 = 自动探测常见安装位置）
+  xplanePath: process.env.XPLANE_PATH || '',
   flightStaleTimeoutMs: intEnv('FLIGHT_STALE_TIMEOUT_MS', 5000),
   updateHz: intEnv('UPDATE_HZ', 2),
   trackMaxMinutes: intEnv('TRACK_MAX_MINUTES', 30),

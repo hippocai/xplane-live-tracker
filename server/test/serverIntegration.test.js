@@ -118,6 +118,19 @@ test('REST 接口与 WS 协议（真实进程）', async (t) => {
   assert.equal(t3.data.minutes, 5)
   assert.ok(Array.isArray(t3.data.points))
 
+  // —— 导航图层接口：形状与参数校验（是否加载取决于本机是否有 X-Plane）——
+  const nav = await getJson('/api/navpoints?lat=40&lon=116&radiusKm=100&types=airport')
+  assert.equal(nav.status, 200)
+  assert.ok(Array.isArray(nav.data.points))
+  assert.equal(typeof nav.data.loaded, 'boolean')
+  assert.ok('counts' in nav.data)
+  const navBad = await getJson('/api/navpoints?lat=abc&lon=116')
+  assert.equal(navBad.status, 400)
+  assert.equal(navBad.data.error.code, 'INVALID_PARAMS')
+  const navCfg = await getJson('/api/nav-config')
+  assert.equal(navCfg.status, 200)
+  assert.ok('loaded' in navCfg.data && 'xplanePath' in navCfg.data)
+
   // —— 静态首页 ——
   const page = await fetch(`${BASE}/`)
   assert.equal(page.status, 200)

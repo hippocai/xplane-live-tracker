@@ -27,6 +27,7 @@ let baiduAuto = true // 进入大陆自动切百度（可在设置面板开关�
 let baseProvider = 'osm' // /api/config 指定的底图（google 目前兜底为 osm）
 let activeProvider = null // 当前实际使用的底图
 let containerEl = null
+const mapRebuiltCbs = [] // 底图切换重建地图后的回调（navLayers 等外部模块重挂监听用）
 
 /**
  * 初始化地图
@@ -81,6 +82,14 @@ function buildMap(provider, restore = {}) {
   rebuildPolylines()
   if (lastPosition && flightActive) {
     createMarker(lastPosition)
+  }
+  // 通知外部模块（如图层）地图已重建，需重新挂载
+  for (const cb of mapRebuiltCbs) {
+    try {
+      cb()
+    } catch (err) {
+      console.error('onMapRebuilt 回调异常', err)
+    }
   }
 }
 
@@ -233,6 +242,16 @@ export const api = {
   /** 当前是否跟随飞机（拖动地图/置灰会自动关闭，recenter/开关恢复） */
   isFollowing() {
     return follow
+  },
+
+  /** 当前 Leaflet 地图实例（供 navLayers 等外部模块挂 moveend 等事件） */
+  getMap() {
+    return map
+  },
+
+  /** 注册"地图重建"回调（底图切换会销毁重建地图实例） */
+  onMapRebuilt(cb) {
+    if (typeof cb === 'function') mapRebuiltCbs.push(cb)
   },
 }
 
