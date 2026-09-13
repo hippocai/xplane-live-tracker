@@ -347,6 +347,35 @@ body {
 }
 
 /* —— 导航图层 —— */
+/* 徽章式 SVG 标记：白描边 + 阴影保证在彩色底图上醒目 */
+.nav-icon {
+  background: none;
+  border: none;
+}
+.nav-icon svg {
+  display: block;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
+/* 机场常显名称标签：白晕描边，缩放 ≥9 级（容器 class 控制）才显示避免低缩放过密 */
+.nav-label {
+  display: none;
+  padding: 0 2px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow:
+    -1px -1px 0 #fff,
+    1px -1px 0 #fff,
+    -1px 1px 0 #fff,
+    1px 1px 0 #fff,
+    0 0 4px #fff;
+}
+#map.nav-labels-on .nav-label {
+  display: block;
+}
 .layers-pop {
   /* 顶部需避开悬浮按钮列（三个 42px 按钮 + 间距，底缘约 154px），
      否则弹层会盖住 ⚙/🧭 按钮导致无法关闭 */
@@ -361,34 +390,6 @@ body {
 .layers-title {
   font-weight: 700;
   margin-bottom: 4px;
-}
-.nav-icon {
-  background: none;
-  border: none;
-}
-.nav-ico {
-  display: block;
-  width: 16px;
-  text-align: center;
-  line-height: 16px;
-  user-select: none;
-}
-.nav-airport {
-  color: #1565c0;
-  font-size: 13px;
-}
-.nav-navaid {
-  color: #7b1fa2;
-  font-size: 11px;
-}
-.nav-navaid.ndb {
-  color: #ad1457;
-}
-.nav-fix {
-  color: #616161;
-  font-size: 8px;
-  line-height: 16px;
-  transform: rotate(45deg);
 }
 
 /* —— 响应式：窄屏（手机/平板竖屏）—— */
