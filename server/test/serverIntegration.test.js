@@ -49,7 +49,14 @@ test('REST 接口与 WS 协议（真实进程）', async (t) => {
   rmSync(CONFIG_PATH, { force: true })
   const child = spawn(process.execPath, ['server/src/index.js'], {
     cwd: rootDir,
-    env: { ...process.env, PORT: String(PORT), XPLANE_MODE: 'webapi' },
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      XPLANE_MODE: 'webapi',
+      // 隔离：把 X-Plane Web API 指到一个必然无人监听的端口，避免测试进程
+      // 连上开发机上真实运行的 X-Plane（会导致 connected 断言不稳定）
+      XPLANE_WEBAPI_PORT: '1',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   // 消费输出避免管道缓冲阻塞
@@ -90,7 +97,7 @@ test('REST 接口与 WS 协议（真实进程）', async (t) => {
   assert.equal(mode.status, 200)
   assert.equal(mode.data.activeMode, 'webapi')
   assert.equal(mode.data.webapi.host, '127.0.0.1')
-  assert.equal(mode.data.webapi.port, 8086)
+  assert.equal(mode.data.webapi.port, 1, '应使用隔离 env 指定的端口（见 spawn env）')
   assert.equal(mode.data.udp.listenPort, 49005)
   assert.equal(typeof mode.data.flightStaleTimeoutMs, 'number')
 

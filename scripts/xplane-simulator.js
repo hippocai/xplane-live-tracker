@@ -1,8 +1,8 @@
 // X-Plane 协议模拟器 —— 在没有真实 X-Plane 的环境下联调后端与前端。
 //
-// 模拟两种协议（与 design_specs.md §4 对应）：
-//   A. Web API：GET /api/v2/capabilities、GET /api/v2/datarefs?filter[name]=...、
-//      WS /api/v2/ws 上的 dataref_subscribe_values / dataref_values 推送
+// 模拟两种协议（对齐 X-Plane 官方 Web API，2026-09 真机实测）：
+//   A. Web API：GET /api/capabilities（无版本前缀）、GET /api/v2/datarefs?filter[name]=...、
+//      WS /api/v1 上的 dataref_subscribe_values 订阅与 dataref_update_values 增量推送
 //   B. UDP：DATA 帧广播（行 18 经纬高度 / 20 姿态航向 / 21 速度 / 3 速度分量），
 //      小端编码（后端 udpClient 有大小端自适应，LE 为现代 X-Plane 实际行为）
 //
@@ -313,15 +313,19 @@ let udpSendCount = 0
 // —— Web API（HTTP + WS）——
 let httpServer = null
 let wss = null
-const subscriptions = new Map() // ws → { ids:Set, frequency, requestId }
+const subscriptions = new Map() // ws → { ids:Set, last:Map(id→上次推送值) }
 
 if (args.mode === 'webapi' || args.mode === 'both') {
   httpServer = http.createServer((req, res) => {
     const url = new URL(req.url, `http://127.0.0.1:${args.httpPort}`)
-    if (url.pathname === '/api/v2/capabilities') {
+    // 官方格式：capabilities 端点无版本前缀
+    if (url.pathname === '/api/capabilities') {
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(
-        JSON.stringify({ name: 'X-Plane 12 (simulator)', version: '4.1.0', sdk_version: '4.1.0' }),
+        JSON.stringify({
+          api: { versions: ['v1', 'v2'] },
+          'x-plane': { version: '12.1.4 (simulator)' },
+        }),
       )
       return
     }
@@ -338,19 +342,22 @@ if (args.mode === 'webapi' || args.mode === 'both') {
     res.end(JSON.stringify({ error: 'not found' }))
   })
 
-  wss = new WebSocketServer({ server: httpServer, path: '/api/v2/ws' })
+  // 官方协议：WS 路径为 /api/v1（REST 是 /api/v2，二者版本号不同步）
+  wss = new WebSocketServer({ server: httpServer, path: '/api/v1' })
   wss.on('connection', (ws) => {
     console.log('[连接] 客户端建立 WebSocket 连接')
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString())
         if (msg?.type === 'dataref_subscribe_values') {
-          subscriptions.set(ws, {
-            ids: new Set(msg.data?.ids || []),
-            frequency: msg.data?.frequency || args.hz,
-            requestId: msg.request_id ?? 1,
-          })
-          console.log(`[订阅] ${msg.data?.ids?.length ?? 0} 个 dataref @ ${msg.data?.frequency}Hz`)
+          // 官方格式：{req_id:<数字>, type, params:{datarefs:[{id},...]}}，无频率参数
+          const sub = subscriptions.get(ws) || { ids: new Set(), last: new Map() }
+          for (const d of msg.params?.datarefs || []) {
+            if (d?.id != null) sub.ids.add(d.id)
+          }
+          subscriptions.set(ws, sub)
+          ws.send(JSON.stringify({ req_id: msg.req_id, type: 'result', success: true }))
+          console.log(`[订阅] ${sub.ids.size} 个 dataref`)
         }
       } catch {
         /* 忽略非 JSON 消息 */
@@ -363,7 +370,9 @@ if (args.mode === 'webapi' || args.mode === 'both') {
   })
 
   httpServer.listen(args.httpPort, '127.0.0.1', () => {
-    console.log(`[OK] Web API 模拟就绪：http://127.0.0.1:${args.httpPort}/api/v2/capabilities`)
+    console.log(
+      `[OK] Web API 模拟就绪：http://127.0.0.1:${args.httpPort}/api/capabilities（WS: /api/v1）`,
+    )
   })
   httpServer.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -412,7 +421,8 @@ function currentValues(st) {
     { id: 8, value: st.roll },
     { id: 9, value: st.pitch },
     { id: 10, value: st.vsFpm },
-    { id: 11, value: args.tail },
+    // value_type 'data' 的字符串 dataref 按官方格式以 base64 下发
+    { id: 11, value: Buffer.from(args.tail, 'ascii').toString('base64') },
   ]
 }
 
@@ -425,20 +435,20 @@ const timer = setInterval(
     const st = model.step(dtSim)
     tickCount++
 
-    // WS 推送：按各订阅者请求的频率节流（与真实 Web API 行为一致）
+    // WS 推送：官方格式 dataref_update_values，data 为 {id: value} 且只含变化值（首帧全量）
     if (wss) {
       for (const [ws, sub] of subscriptions) {
         if (ws.readyState !== ws.OPEN) continue
-        const every = Math.max(1, Math.round(args.hz / Math.min(sub.frequency, args.hz)))
-        if (tickCount % every !== 0) continue
-        const values = currentValues(st).filter((v) => sub.ids.has(v.id))
-        ws.send(
-          JSON.stringify({
-            type: 'dataref_values',
-            request_id: sub.requestId,
-            data: { values, timestamp: Date.now() },
-          }),
-        )
+        const data = {}
+        for (const { id, value } of currentValues(st)) {
+          if (!sub.ids.has(id)) continue
+          if (sub.last.get(id) !== value) {
+            data[id] = value
+            sub.last.set(id, value)
+          }
+        }
+        if (Object.keys(data).length === 0) continue
+        ws.send(JSON.stringify({ type: 'dataref_update_values', data }))
         wsSendCount++
       }
     }

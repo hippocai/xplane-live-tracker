@@ -1,14 +1,25 @@
 // 方案 A：X-Plane 12 内置 Web API 客户端（设计文档 §4.1 / §15.3.3）。
-// 流程：REST 探测 capabilities → 查询 dataref 数值 ID（每次 connect 查一次并缓存）→
-// WebSocket 订阅 dataref_subscribe_values（固定 5Hz，降低 X-Plane 侧负担）→
-// 把推送值组装为统一的 AircraftPosition 并 emit('position')。
-// 断线时按 1s → 2s → 5s → 10s（封顶）指数退避自动重连（§4.4）。
+// 协议按官方文档 + 真实安装实测（2026-09，X-Plane 12.1.x，developer.x-plane.com/article/x-plane-web-api）：
+//   - 探测：GET /api/capabilities（注意无版本前缀）。任何 HTTP 响应都说明 Web 服务在线
+//     （老版本无此端点返回 404 属正常）；403 = Network 设置里禁了传入流量；仅连接失败视为不可达。
+//   - dataref 查询：GET /api/v2/datarefs?filter[name]=...（信封 {data:[{id,name,value_type}]}，
+//     id 为大数字，单会话内稳定、跨会话会变）。
+//   - WebSocket：ws://host:port/api/v1（REST 是 /api/v2，WS 用 v1 路径——实测 v1 可用）。
+//   - 订阅：{"req_id":<数字>, type:"dataref_subscribe_values", params:{datarefs:[{id},...]}}。
+//     无频率参数，服务器固定 10Hz 推送（后端 wsHub 仍按 updateHz 节流广播给前端）。
+//   - 推送：{"type":"dataref_update_values", data:{ "<id>": value, ... }}——只含**变化的**字段
+//     （首帧全量），因此客户端必须跨帧缓存合并出完整值表再组装 position。
+//   - 字符串型 dataref（如 acf_tailnum）value_type 为 'data'，值以 base64 下发。
+// 断线按 1s→2s→5s→10s（封顶）指数退避自动重连（§4.4）。
 import { EventEmitter } from 'node:events'
 import axios from 'axios'
 import WebSocket from 'ws'
 import { logger } from '../utils/logger.js'
 
 const MS_TO_KT = 1.94384 // 地速 m/s → 节
+
+const REST_PREFIX = '/api/v2'
+const WS_PATH = '/api/v1'
 
 // 需要订阅的 dataref（§4.1 表格）。field 为 AircraftPosition 字段名；
 // convert 为可选的单位换算；optional 为 true 时查询不到不视为致命错误。
@@ -30,8 +41,6 @@ export const DATAREF_SPECS = [
   { name: 'sim/aircraft/view/acf_tailnum', field: 'tailNumber', optional: true },
 ]
 
-// 订阅推送频率（Hz）。上游设计建议 5～10Hz，固定取 5：广播侧还会按 updateHz 节流（§15.3.3）。
-const SUBSCRIBE_HZ = 5
 // 指数退避序列（毫秒），超出后封顶在最后一个值
 const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000]
 
@@ -47,8 +56,10 @@ export class WebApiClient extends EventEmitter {
     this.reconnectTimer = null
     this.attempts = 0
     this.intentionalClose = false
-    // dataref 数值 ID → 字段名 的映射（每次 connect 重新解析，避免版本变化后失效）
+    // dataref 数值 ID → 字段规格 的映射（每次 connect 重新解析，ID 跨会话不稳定）
     this.idToField = new Map()
+    // 跨帧值缓存：官方推送只含变化字段，需合并成完整值表再组装 position
+    this.lastValues = new Map()
   }
 
   get baseUrl() {
@@ -61,19 +72,27 @@ export class WebApiClient extends EventEmitter {
    */
   async connect() {
     this.intentionalClose = false
-    // 1. 探测服务可用性（3s 超时，§15.3.3 实现要点 1）
+    this.lastValues.clear()
+    // 1. 可达性探测。任何 HTTP 响应（含 404）都说明 Web 服务在线——
+    //    capabilities 端点在 12.1.4 之前不存在，404 不能当作"连不上"。
     try {
-      await axios.get(`${this.baseUrl}/api/v2/capabilities`, { timeout: 3000 })
+      const res = await axios.get(`${this.baseUrl}/api/capabilities`, {
+        timeout: 3000,
+        validateStatus: () => true,
+      })
+      if (res.status === 403) {
+        const message =
+          'X-Plane Web API 返回 403：请在 Settings → Network 中允许传入连接（不要选 Disable Incoming Traffic）'
+        this.#emitError('FORBIDDEN', message)
+        throw { code: 'FORBIDDEN', message } // eslint-disable-line no-throw-literal
+      }
     } catch (err) {
-      const code = err?.response?.status === 403 ? 'FORBIDDEN' : 'WEBAPI_UNREACHABLE'
-      const message =
-        code === 'FORBIDDEN'
-          ? `X-Plane Web API 拒绝访问（403）：请在 Settings → Network 中勾选"允许接受传入连接"`
-          : `无法连接 X-Plane Web API（${this.host}:${this.port}）：${err.message}`
-      this.#emitError(code, message)
-      throw { code, message } // eslint-disable-line no-throw-literal
+      if (err?.code === 'FORBIDDEN') throw err
+      const message = `无法连接 X-Plane Web API（${this.host}:${this.port}）：${err.message}`
+      this.#emitError('WEBAPI_UNREACHABLE', message)
+      throw { code: 'WEBAPI_UNREACHABLE', message } // eslint-disable-line no-throw-literal
     }
-    // 2. 解析 dataref ID（只查一次并缓存）
+    // 2. 解析 dataref ID（只查一次并缓存，ID 在同一 X-Plane 会话内稳定）
     await this.#resolveDatarefIds()
     // 3. 建立 WS 并订阅（重连路径也走这里）
     await this.#openSocket()
@@ -102,13 +121,12 @@ export class WebApiClient extends EventEmitter {
     this.idToField.clear()
     for (const spec of DATAREF_SPECS) {
       try {
-        // filter[name] 查询该 dataref 的数值 ID
-        const res = await axios.get(`${this.baseUrl}/api/v2/datarefs`, {
+        const res = await axios.get(`${this.baseUrl}${REST_PREFIX}/datarefs`, {
           params: { 'filter[name]': spec.name },
           timeout: 3000,
         })
         const list = Array.isArray(res.data?.data) ? res.data.data : []
-        // 取 name 完全匹配的第一条（不同版本返回的元数据字段可能有差异）
+        // 取 name 完全匹配的第一条
         const hit = list.find((d) => d?.name === spec.name)
         if (hit && hit.id != null) {
           this.idToField.set(hit.id, spec)
@@ -128,18 +146,17 @@ export class WebApiClient extends EventEmitter {
 
   #openSocket() {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`ws://${this.host}:${this.port}/api/v2/ws`)
+      const ws = new WebSocket(`ws://${this.host}:${this.port}${WS_PATH}`)
       this.ws = ws
       let settled = false
 
       ws.on('open', () => {
-        // 订阅请求：request_id + dataref_subscribe_values（§4.1）
-        const ids = [...this.idToField.keys()]
+        // 官方订阅格式：req_id 必须是数字，datarefs 为 [{id}] 数组，无频率参数（服务器固定 10Hz）
         ws.send(
           JSON.stringify({
+            req_id: 1,
             type: 'dataref_subscribe_values',
-            request_id: 1,
-            data: { ids, frequency: SUBSCRIBE_HZ },
+            params: { datarefs: [...this.idToField.keys()].map((id) => ({ id })) },
           }),
         )
         settled = true
@@ -186,10 +203,8 @@ export class WebApiClient extends EventEmitter {
       this.reconnectTimer = null
       if (this.intentionalClose) return
       try {
-        // 重连时重新探测 + 重新解析 dataref ID（X-Plane 重启后 ID 可能变化）
-        await axios.get(`${this.baseUrl}/api/v2/capabilities`, { timeout: 3000 })
-        await this.#resolveDatarefIds()
-        await this.#openSocket()
+        // 重连时重新探测 + 重新解析 dataref ID（X-Plane 重启后 ID 会变化）
+        await this.connect()
       } catch (err) {
         this.#emitError(err?.code || 'WEBAPI_UNREACHABLE', err?.message || '重连失败')
         this.#scheduleReconnect()
@@ -199,16 +214,23 @@ export class WebApiClient extends EventEmitter {
   }
 
   #handleMessage(msg) {
-    // 服务端错误消息：记录并继续（订阅本身失败不改变连接状态）
-    if (msg?.type === 'error') {
-      logger.warn({ msg }, 'X-Plane Web API 返回错误')
+    // 订阅/操作结果：失败记 warn（如 dataref id 失效），不中断连接
+    if (msg?.type === 'result') {
+      if (msg.success === false) {
+        logger.warn(
+          { error_code: msg.error_code, error_message: msg.error_message },
+          'Web API 请求失败',
+        )
+      }
       return
     }
-    // 数值推送：{ type: 'dataref_values', data: { values: [{id, value}, ...] } }
-    // 对消息结构做防御性解析：兼容 values 数组或以 id 为键的对象映射两种形态
-    const values = msg?.data?.values
-    if (!values) return
-    const position = buildPositionFromValues(this.idToField, values, Date.now())
+    // 数值推送：{ type: 'dataref_update_values', data: { '<id>': value } }
+    if (msg?.type !== 'dataref_update_values' || !msg.data || typeof msg.data !== 'object') return
+    // 增量合并：官方只推变化的字段（首帧全量），跨帧缓存合并出完整值表
+    for (const [k, v] of Object.entries(msg.data)) {
+      this.lastValues.set(Number(k), v)
+    }
+    const position = buildPositionFromValues(this.idToField, this.lastValues, Date.now())
     if (position) this.emit('position', position)
   }
 
@@ -219,32 +241,40 @@ export class WebApiClient extends EventEmitter {
 }
 
 /**
- * 把一帧 dataref 数值组装为 AircraftPosition（纯函数，便于单元测试）。
+ * 把"当前已知的全部 dataref 值"组装为 AircraftPosition（纯函数，便于单元测试）。
  * 缺失的字段置 null；经纬度缺失或非法时返回 null（没有位置就没有有效帧）。
  * @param {Map<number, {field: string, convert?: Function}>} idToField
- * @param {Array<{id: number|string, value: any}>|Object<string, any>} values
+ * @param {Map<number, any>|Object<string, any>|Array<{id, value}>} values 完整值表（支持 Map / 对象 / 数组形态）
  * @param {number} timestamp
  * @returns {Object|null}
  */
 export function buildPositionFromValues(idToField, values, timestamp) {
-  const pairs = Array.isArray(values)
-    ? values.map((v) => [v?.id, v?.value])
-    : Object.entries(values || {}).map(([id, value]) => [Number(id), value])
+  let pairs
+  if (Array.isArray(values)) {
+    pairs = values.map((v) => [v?.id, v?.value])
+  } else if (values instanceof Map) {
+    pairs = [...values.entries()]
+  } else {
+    pairs = Object.entries(values || {}).map(([id, value]) => [Number(id), value])
+  }
 
   const raw = {}
   for (const [id, value] of pairs) {
     const spec = idToField.get(id)
     if (!spec) continue
-    // 字符串型 dataref（如注册号）可能以 char 数组形式下发
-    let v = value
+    // 字符串型 dataref（value_type 'data'）以 base64 下发；兼容 char 数组形态
     if (spec.field === 'tailNumber') {
-      v =
-        typeof value === 'string'
-          ? value
-          : Array.isArray(value)
-            ? String.fromCharCode(...value.filter((c) => c > 0))
-            : null
-      raw[spec.field] = v || null
+      let v = null
+      if (typeof value === 'string') {
+        try {
+          v = Buffer.from(value, 'base64').toString('ascii')
+        } catch {
+          v = value
+        }
+      } else if (Array.isArray(value)) {
+        v = String.fromCharCode(...value.filter((c) => Number.isFinite(c) && c > 0))
+      }
+      raw[spec.field] = (v || '').replace(/\0/g, '').trim() || null
       continue
     }
     const n = Number(value)

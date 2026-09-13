@@ -82,3 +82,33 @@ test('字符串型 dataref：char 数组 → 注册号字符串', () => {
   )
   assert.equal(pos.tailNumber, 'N12345')
 })
+
+test('官方真实协议形态：Map 值表 + 大数字 id + base64 注册号（value_type data）', () => {
+  const BIG = 2349669257976 // 实测真机 dataref id 量级（>int32，<2^53 精确）
+  const idToField = new Map()
+  idToField.set(BIG, DATAREF_SPECS[0]) // latitude
+  idToField.set(BIG + 1, DATAREF_SPECS[1]) // longitude
+  idToField.set(BIG + 10, DATAREF_SPECS[10]) // acf_tailnum
+  const values = new Map([
+    [BIG, 30.803722],
+    [BIG + 1, 104.123456],
+    [BIG + 10, Buffer.from('B-20AC', 'ascii').toString('base64')],
+  ])
+  const pos = buildPositionFromValues(idToField, values, 1)
+  assert.equal(pos.lat, 30.803722)
+  assert.equal(pos.lon, 104.123456)
+  assert.equal(pos.tailNumber, 'B-20AC')
+})
+
+test('增量推送语义：Map 里只有部分字段变化时，缺失字段置 null（客户端负责跨帧合并）', () => {
+  const idToField = makeIdToField()
+  // 只有高度在变（真实服务器只推变化的字段）
+  const partial = new Map([
+    [1, 31.2],
+    [2, 121.5],
+    [3, 5000],
+  ])
+  const pos = buildPositionFromValues(idToField, partial, 1)
+  assert.equal(pos.altMsl, 5000)
+  assert.equal(pos.heading, null, '未推送的字段应为 null 而非报错')
+})

@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`design_specs.md`（v1.3）是权威实现规范**。README 中引用的《XPlane12-飞机位置追踪工具-设计文档.md》即指此文件。改动任何模块前，先读 `design_specs.md` 第 15 节对应小节——那里有每个文件的职责、函数签名、边界情况处理要求与验收标准。实现允许微调签名，但对外 REST/WS 协议（第 4.3.2、7 节）必须保持不变。
 - **未实现的项**：M8 可选项中的 Google Maps 底图切换（`mapController.js` 目前无论 provider 一律用 OSM 瓦片兜底，参数与 `/api/config` 字段已预留）。
 - **UDP 行映射**：X-Plane DATA 广播的行号映射集中在 `server/src/xplane/udpClient.js` 顶部的 `DATA_ROW_MAP`（含"需要在 X-Plane Data Output 中启用哪些行"的说明）。若某版本行号定义有出入，只调该表即可。UDP 解析做了小端/大端自适应探测。
+- **Web API 真实协议（2026-09 真机实测，与 design_specs.md §4.1 的假设有多处不同，以 developer.x-plane.com/article/x-plane-web-api 为准）**：探测用 `GET /api/capabilities`（**无版本前缀**；404 属正常=老版本，仅连接失败才是不可达，403=Network 设置禁了传入流量）；dataref 查询 `/api/v2/datarefs?filter[name]=`（id 是大数字，单会话稳定、跨会话会变）；**WS 路径是 `/api/v1`**（REST v2 与 WS v1 版本号不同步）；订阅 `{req_id:<数字>, type:"dataref_subscribe_values", params:{datarefs:[{id}]}}`（req_id 必须数字、无频率参数，服务器固定 10Hz 推送）；推送 `{type:"dataref_update_values", data:{"<id>":value}}` **只含变化字段**（首帧全量）——`webApiClient` 用 `lastValues` Map 跨帧合并；字符串 dataref（acf_tailnum）value_type='data'，值 base64 编码。
 
 ## 命令
 
