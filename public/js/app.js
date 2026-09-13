@@ -118,10 +118,18 @@ function initNavUi() {
     onMapRebuilt: (cb) => mapApi?.onMapRebuilt(cb),
   })
 
-  // 🧭 按钮开关弹层
+  // 🧭 按钮开关弹层；点击面板外任意处也可关闭（弹层标准行为）
   const panel = document.getElementById('layers-panel')
-  document.getElementById('layers-btn')?.addEventListener('click', () => {
+  const layersBtn = document.getElementById('layers-btn')
+  layersBtn?.addEventListener('click', (e) => {
     panel.hidden = !panel.hidden
+    e.stopPropagation() // 防止这次点击立刻被下面的 document 监听当成"点击外部"关闭
+  })
+  document.addEventListener('click', (e) => {
+    if (panel.hidden) return
+    if (panel.contains(e.target)) return
+    if (layersBtn?.contains(e.target)) return
+    panel.hidden = true
   })
 
   // 三个图层开关：立即生效并持久化

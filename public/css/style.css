@@ -348,10 +348,14 @@ body {
 
 /* —— 导航图层 —— */
 .layers-pop {
-  top: 64px;
+  /* 顶部需避开悬浮按钮列（三个 42px 按钮 + 间距，底缘约 154px），
+     否则弹层会盖住 ⚙/🧭 按钮导致无法关闭 */
+  top: 164px;
   right: 12px;
   z-index: 1250;
   min-width: 190px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
   font-size: 14px;
 }
 .layers-title {
